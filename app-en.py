@@ -1,15 +1,17 @@
+
 import streamlit as st
 import pandas as pd
 import os
+import base64
 
-# ---------------- Basic Page Config ----------------
+# ---------------- 기본 설정 ----------------
 st.set_page_config(
     page_title="Everest Inventory Management System",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ---------------- Global Style (CSS) ----------------
+# ---------------- 글로벌 스타일 (CSS) ----------------
 CUSTOM_CSS = """
 <style>
 /* App background */
@@ -115,23 +117,32 @@ div[data-testid="stAlert"] {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# ---------------- Config ----------------
-DATA_FILE = "inventory_data.csv"  # CSV file path
+# ---------------- 설정 ----------------
+DATA_FILE = "inventory_data.csv"   # CSV 파일
+LOGO_FILE = "everest_logo.png"     # 동그란 로고 파일 이름
 
-# Branch names remain in Korean because they are actual store names
+# 지점 이름 (실제 지점명이라 한국어 유지)
 branches = ["동대문", "굿모닝시티", "양재", "수원영통", "동탄", "영등포", "룸비니"]
 
-# Categories can stay as-is or be changed to English if you prefer
+# 카테고리 (영어로 표기)
 categories = [
     "Meat", "Vegetable", "Seafood", "Spice",
     "Sauce", "Grain/Noodle", "Beverage", "Packaging", "Other"
 ]
 
-# Column names remain Korean for full compatibility with existing CSV:
-# ["지점", "품목명", "카테고리", "단위", "현재수량", "최소수량", "비고"]
+# ---------------- 로고 base64 로딩 ----------------
+def load_logo_base64():
+    if os.path.exists(LOGO_FILE):
+        try:
+            with open(LOGO_FILE, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
+        except Exception:
+            return ""
+    return ""
 
+logo_b64 = load_logo_base64()
 
-# ---------------- Load / Save Helpers ----------------
+# ---------------- 데이터 로드/저장 함수 ----------------
 def load_inventory():
     if os.path.exists(DATA_FILE):
         try:
@@ -152,37 +163,48 @@ def save_inventory(df: pd.DataFrame):
     df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
 
 
-# ---------------- Session Init ----------------
+# ---------------- 세션 초기화 ----------------
 if "inventory" not in st.session_state:
     st.session_state.inventory = load_inventory()
 
-# ---------------- Header ----------------
-st.markdown(
+# ---------------- 상단 헤더 ----------------
+logo_block_html = ""
+if logo_b64:
+    logo_block_html = f"""
+    <div style="display:flex; align-items:center; justify-content:center; margin-right:1.2rem;">
+        <img src="data:image/png;base64,{logo_b64}" style="height:64px; border-radius:50%; box-shadow:0 0 0 2px rgba(248,250,252,0.9);" />
+    </div>
     """
+
+st.markdown(
+    f"""
 <div class="card" style="margin-bottom: 1.2rem;">
   <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
-    <div>
-      <h1 style="margin-bottom:0.2rem;">📦 EVEREST Inventory Management System</h1>
-      <p style="margin-top:0.2rem; color:#9ca3af;">
-        Internal dashboard to manage stock by branch and item, and quickly identify low-stock items that require reordering.
-      </p>
+    <div style="display:flex; align-items:center; gap:1.2rem;">
+      {logo_block_html}
+      <div>
+        <h1 style="margin-bottom:0.2rem;">📦 EVEREST Inventory Management System</h1>
+        <p style="margin-top:0.2rem; color:#9ca3af;">
+          Internal dashboard to manage stock by branch and item, and quickly identify low-stock items that require reordering.
+        </p>
+      </div>
     </div>
     <div class="metric-card">
       <div style="font-size:0.85rem; color:#9ca3af;">Total items stored</div>
       <div style="font-size:1.4rem; font-weight:600; color:#e5e7eb; margin-top:0.1rem;">
-        {count} items
+        {len(st.session_state.inventory)} items
       </div>
     </div>
   </div>
 </div>
-""".format(count=len(st.session_state.inventory)),
+""",
     unsafe_allow_html=True,
 )
 
-tab_input, tab_view = st.tabs(["✏ Input / Edit Stock", "📊 View Inventory"])
+tab_input, tab_view = st.tabs(["✏ Input / Edit Stock", "📊 View / Print Inventory"])
 
 # =========================================================
-# 🔹 TAB 1: Input / Edit Inventory
+# TAB 1: Input / Edit Inventory
 # =========================================================
 with tab_input:
     st.markdown('<div class="card">', unsafe_allow_html=True)
@@ -205,7 +227,7 @@ with tab_input:
         save_btn = st.button("💾 Save / Update item")
         del_btn = st.button("🗑 Delete item (by branch + name)")
 
-    # Save / Update
+    # 저장 / 업데이트
     if save_btn:
         if name.strip() == "":
             st.warning("Please enter the item name.")
@@ -236,7 +258,7 @@ with tab_input:
             st.session_state.inventory = df
             save_inventory(df)
 
-    # Delete
+    # 삭제
     if del_btn:
         df = st.session_state.inventory.copy()
         mask = (df["지점"] == branch) & (df["품목명"] == name)
@@ -254,18 +276,18 @@ with tab_input:
 
 
 # =========================================================
-# 🔹 TAB 2: View Inventory (Top-Down Filters)
+# TAB 2: View / Print Inventory (Top-Down + Print-friendly)
 # =========================================================
 with tab_view:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("View Inventory (Branch → Category → Item Top-Down)")
+    st.subheader("View / Print Inventory (Branch → Category → Item)")
 
     df = st.session_state.inventory.copy()
 
     if df.empty:
         st.info("No inventory data found. Please add items in the 'Input / Edit Stock' tab first.")
     else:
-        # Ensure numeric types
+        # 숫자형 변환
         for col in ["현재수량", "최소수량"]:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
@@ -304,7 +326,7 @@ with tab_view:
         if filtered.empty:
             st.info("No items match the selected conditions.")
         else:
-            # Highlight low-stock rows
+            # 화면용 하이라이트
             def highlight_low(row):
                 if row["현재수량"] <= row["최소수량"]:
                     return [
@@ -316,7 +338,89 @@ with tab_view:
             styled = filtered.style.apply(highlight_low, axis=1)
             st.dataframe(styled, use_container_width=True)
 
-            # Download filtered result
+            # ---------- PRINT-FRIENDLY HTML 생성 ----------
+            html_table = filtered.to_html(index=False, border=1, justify="center")
+
+            if logo_b64:
+                print_logo_block = f'<img src="data:image/png;base64,{logo_b64}" style="height:72px; border-radius:50%; margin-bottom:8px;" />'
+            else:
+                print_logo_block = ""
+
+            printable_html = """
+            <html>
+            <head>
+            <meta charset="utf-8" />
+            <style>
+            body {{
+                font-family: Arial, sans-serif;
+                padding: 24px;
+                background: #ffffff;
+                color: #000000;
+            }}
+            h2 {{
+                text-align: center;
+                margin-bottom: 6px;
+            }}
+            .meta {{
+                text-align: center;
+                font-size: 12px;
+                color: #555;
+                margin-bottom: 18px;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 13px;
+            }}
+            th, td {{
+                border: 1px solid #444;
+                padding: 6px 8px;
+                text-align: center;
+            }}
+            th {{
+                background: #e5e7eb;
+                font-weight: bold;
+            }}
+            @media print {{
+                body {{
+                    margin: 0;
+                }}
+                table {{
+                    page-break-inside: avoid;
+                }}
+            }}
+            </style>
+            </head>
+            <body>
+            <div style="text-align:center; margin-bottom:12px;">
+              {logo_block}
+              <h2>Everest Inventory - Printable Report</h2>
+              <div class="meta">
+                Branch: {branch} | Category: {category} | Item: {item} | Only low stock: {only_low}
+              </div>
+            </div>
+            {table}
+            </body>
+            </html>
+            """.format(
+                logo_block=print_logo_block,
+                branch=selected_branch,
+                category=selected_category,
+                item=selected_item,
+                only_low="Yes" if only_low else "No",
+                table=html_table
+            )
+
+            # 인쇄용 HTML 다운로드 버튼
+            st.download_button(
+                label="🖨 Download Print-Friendly HTML",
+                data=printable_html,
+                file_name="everest_inventory_print.html",
+                mime="text/html",
+            )
+            st.caption("Open the downloaded HTML file in a browser and press Ctrl+P to print or save as PDF.")
+
+            # CSV 다운로드
             csv = filtered.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
                 label="⬇ Download current view as CSV",
