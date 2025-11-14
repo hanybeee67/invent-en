@@ -18,8 +18,8 @@ CUSTOM_CSS = """
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 .block-container {
-    padding-top: 2.5rem;
-    padding-bottom: 2.5rem;
+    padding-top: 2.0rem;
+    padding-bottom: 2.0rem;
     max-width: 1200px;
 }
 h1, h2, h3, h4 {
@@ -31,18 +31,19 @@ p, .stMarkdown {
 }
 .card {
     background: linear-gradient(135deg, rgba(15,23,42,0.96), rgba(15,23,42,0.9));
-    padding: 1.6rem 1.8rem;
+    padding: 1.4rem 1.6rem;
     border-radius: 18px;
     border: 1px solid rgba(148,163,184,0.4);
     box-shadow: 0 22px 55px rgba(15,23,42,0.95);
-    margin-bottom: 1.8rem;
+    margin-bottom: 1.4rem;
 }
 .metric-card {
     background: radial-gradient(circle at top left, rgba(30,64,175,0.35), rgba(15,23,42,0.98));
-    padding: 1.0rem 1.2rem;
+    padding: 0.8rem 1.0rem;
     border-radius: 14px;
     border: 1px solid rgba(129,140,248,0.6);
     box-shadow: 0 16px 40px rgba(15,23,42,0.9);
+    min-width: 160px;
 }
 .stTabs [data-baseweb="tab-list"] {
     gap: 0.2rem;
@@ -86,6 +87,12 @@ div[data-testid="stAlert"] {
     background-color: rgba(15,23,42,0.85);
     border-radius: 12px;
 }
+@media (max-width: 640px) {
+  .card-header-wrap {
+      flex-direction: column;
+      align-items: flex-start !important;
+  }
+}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -93,10 +100,8 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # ---------------- Config ----------------
 DATA_FILE = "inventory_data.csv"
 
-# Branch names (real store names, keep Korean)
 branches = ["동대문", "굿모닝시티", "양재", "수원영통", "동탄", "영등포", "룸비니"]
 
-# Categories (English labels, but 저장은 한국어 컬럼에)
 categories = [
     "Meat", "Vegetable", "Seafood", "Spice",
     "Sauce", "Grain/Noodle", "Beverage", "Packaging", "Other"
@@ -125,18 +130,26 @@ def save_inventory(df: pd.DataFrame):
 if "inventory" not in st.session_state:
     st.session_state.inventory = load_inventory()
 
-# ---------------- Header ----------------
+# ---------------- Header (모바일 대응 정렬 수정) ----------------
 st.markdown(
     f"""
-<div class="card" style="margin-bottom: 1.2rem;">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
-    <div>
-      <h1 style="margin-bottom:0.2rem;">📦 EVEREST Inventory Management System</h1>
-      <p style="margin-top:0.2rem; color:#9ca3af;">
+<div class="card">
+  <div class="card-header-wrap" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+    <div style="flex:1 1 220px; min-width:220px;">
+      <h1 style="
+          margin:0 0 0.3rem;
+          font-size:1.7rem;
+          line-height:1.35;
+          word-break:keep-all;
+          white-space:normal;
+        ">
+        Everest Inventory<br/>Management System
+      </h1>
+      <p style="margin:0; color:#9ca3af; font-size:0.9rem;">
         Internal dashboard to manage stock by branch and item, and quickly identify low-stock items that require reordering.
       </p>
     </div>
-    <div class="metric-card">
+    <div class="metric-card" style="text-align:right;">
       <div style="font-size:0.85rem; color:#9ca3af;">Total items stored</div>
       <div style="font-size:1.4rem; font-weight:600; color:#e5e7eb; margin-top:0.1rem;">
         {len(st.session_state.inventory)} items
@@ -351,5 +364,4 @@ with tab_view:
             )
 
     st.markdown('</div>', unsafe_allow_html=True)
-
 
