@@ -6,35 +6,36 @@ import plotly.express as px
 import io
 
 # ================= Page Config ==================
-st.set_page_config(page_title="Everest Inventory Management", layout="wide")
+st.set_page_config(page_title="Everest Inventory System", layout="wide")
 
-# ================= File Paths ==================
+# ================= File Locations ==================
 INV_FILE = "inventory_data.csv"
 HIS_FILE = "history_data.csv"
-PRODUCT_FILE = "food ingrediants.txt"
+ITEM_FILE = "food ingrediants.txt"   # 파일명은 그대로 유지
 
-# ================= Load Product Units from File ==================
-def load_product_units():
-    units = {}
-    if not os.path.exists(PRODUCT_FILE):
-        return units
-    try:
-        with open(PRODUCT_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                parts = [p.strip() for p in line.split('\t') if p.strip()]
-                if len(parts) >= 2:
-                    name = parts[0]
-                    unit = parts[-1]
-                    units[name] = unit
-    except Exception:
-        pass
-    return units
+# ================= Load Items & Units ==================
+def load_items_with_units():
+    items = []
+    if not os.path.exists(ITEM_FILE):
+        return items
+    
+    with open(ITEM_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = [p.strip() for p in line.split("\t") if p.strip()]
+            if len(parts) >= 3:
+                items.append({
+                    "category": parts[0],
+                    "item": parts[1],
+                    "unit": parts[2]
+                })
+    return items
 
-product_units = load_product_units()
+item_db = load_items_with_units()
+categories = sorted(list(set([i["category"] for i in item_db])))
 
-# ================= Load / Save Inventory ==================
+# ================= Inventory Load/Save ==================
 def load_inventory():
-    cols = ["Branch", "Item", "Category", "Unit", "CurrentQty", "MinQty", "Note", "Date"]
+    cols = ["Branch","Category","Item","Unit","CurrentQty","MinQty","Note","Date"]
     if os.path.exists(INV_FILE):
         df = pd.read_csv(INV_FILE)
         return df.reindex(columns=cols, fill_value="")
@@ -43,9 +44,8 @@ def load_inventory():
 def save_inventory(df):
     df.to_csv(INV_FILE, index=False, encoding="utf-8-sig")
 
-# ================= Load / Save History ==================
 def load_history():
-    cols = ["Date", "Branch", "Item", "Type", "Qty"]
+    cols = ["Date","Branch","Category","Item","Unit","Type","Qty"]
     if os.path.exists(HIS_FILE):
         df = pd.read_csv(HIS_FILE)
         return df.reindex(columns=cols, fill_value="")
@@ -61,84 +61,103 @@ if "inventory" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = load_history()
 
-branches = ["동대문", "굿모닝시티", "양재", "수원영통", "동탄", "영등포", "룸비니"]
+branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
 
 # ================= Tabs ==================
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "✏ Register Inventory",
     "📦 Stock IN / OUT",
-    "📄 View Inventory"
+    "📊 Inventory View",
+    "📅 Stock Heatmap",
+    "📄 Monthly Report"
 ])
 
 # ============================================================
-# TAB 1 — Register Inventory with Auto Unit
+# TAB 1 — Register Inventory
 # ============================================================
 with tab1:
     st.subheader("Register New Inventory")
 
-    col1, col2, col3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
 
-    with col1:
+    with c1:
         reg_date = st.date_input("📅 Date", value=date.today(), key="reg_date")
         reg_branch = st.selectbox("Branch", branches, key="reg_branch")
 
-    with col2:
-        reg_item = st.selectbox("Item", sorted(product_units.keys()), key="reg_item")
-        reg_category = st.text_input("Category", value="General", key="reg_category")
+    with c2:
+        reg_category = st.selectbox("Category", categories, key="reg_category")
+        filtered_items = [i for i in item_db if i["category"] == reg_category]
+        reg_item = st.selectbox(
+            "Item",
+            sorted([i["item"] for i in filtered_items]),
+            key="reg_item"
+        )
 
-    with col3:
-        if "reg_unit_value" not in st.session_state:
-            st.session_state["reg_unit_value"] = ""
+    with c3:
+        auto_unit = ""
+        for entry in filtered_items:
+            if entry["item"] == reg_item:
+                auto_unit = entry["unit"]
 
-        # 🔹 제품이 변경되면 자동으로 Unit 업데이트
-        if st.session_state.get("last_item") != reg_item:
-            st.session_state["reg_unit_value"] = product_units.get(reg_item, "")
-            st.session_state["last_item"] = reg_item
-
-        reg_unit = st.text_input("Unit", value=st.session_state["reg_unit_value"], key="reg_unit_input")
+        reg_unit = st.text_input("Unit", value=auto_unit, key="reg_unit")
         reg_qty = st.number_input("Current Qty", min_value=0.0, step=1.0, key="reg_qty")
+
+    with c4:
         reg_min = st.number_input("Minimum Qty", min_value=0.0, step=1.0, key="reg_min")
         reg_note = st.text_input("Note", key="reg_note")
 
-    if st.button("💾 Save Inventory", key="save_btn"):
+    if st.button("💾 Save Inventory", key="reg_btn"):
         df = st.session_state.inventory.copy()
         df.loc[len(df)] = [
-            reg_branch, reg_item, reg_category, reg_unit,
+            reg_branch, reg_category, reg_item, reg_unit,
             reg_qty, reg_min, reg_note, str(reg_date)
         ]
         st.session_state.inventory = df
         save_inventory(df)
-        st.success("Inventory saved successfully!")
+        st.success("Inventory saved!")
 
 # ============================================================
-# TAB 2 — Stock IN / OUT with unit reference
+# TAB 2 — Stock IN / OUT
 # ============================================================
 with tab2:
-    st.subheader("Stock IN / OUT (Auto Update Inventory)")
+    st.subheader("Stock IN / OUT with Auto Update")
 
-    col1, col2, col3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
-    with col1:
-        log_date = st.date_input("Movement Date", value=date.today(), key="log_date")
+    with c1:
+        log_date = st.date_input("Date", value=date.today(), key="log_date")
         log_branch = st.selectbox("Branch", branches, key="log_branch")
 
-    with col2:
-        log_item = st.selectbox("Item", sorted(product_units.keys()), key="log_item")
-        log_type = st.selectbox("Type", ["IN", "OUT"], key="log_type")
+    with c2:
+        log_category = st.selectbox("Category", categories, key="log_category")
+        log_items = [i for i in item_db if i["category"] == log_category]
+        log_item = st.selectbox(
+            "Item",
+            sorted([i["item"] for i in log_items]),
+            key="log_item"
+        )
 
-    with col3:
-        log_unit_auto = product_units.get(log_item, "")
-        st.write(f"📦 Unit: **{log_unit_auto}**")
-        log_qty = st.number_input("Quantity", min_value=0.0, step=1.0, key="log_qty")
+    with c3:
+        auto_unit2 = ""
+        for entry in log_items:
+            if entry["item"] == log_item:
+                auto_unit2 = entry["unit"]
 
-    if st.button("📥 Log Movement & Update Inventory", key="log_btn"):
+        st.write(f"📦 Unit: **{auto_unit2}**")
+        log_type = st.selectbox("Type", ["IN","OUT"], key="log_type")
+        log_qty = st.number_input("Qty", min_value=0.0, step=1.0, key="log_qty")
+
+    if st.button("📥 Record Movement", key="log_btn"):
         # 기록 저장
         his = st.session_state.history.copy()
-        his.loc[len(his)] = [str(log_date), log_branch, log_item, log_type, log_qty]
+        his.loc[len(his)] = [
+            str(log_date), log_branch, log_category,
+            log_item, auto_unit2, log_type, log_qty
+        ]
         st.session_state.history = his
         save_history(his)
 
-        # 재고 자동 반영
+        # 재고 반영
         inv = st.session_state.inventory.copy()
         mask = (inv["Branch"] == log_branch) & (inv["Item"] == log_item)
 
@@ -148,15 +167,22 @@ with tab2:
             else:
                 inv.loc[mask, "CurrentQty"] -= log_qty
         else:
-            st.warning("⚠ Item not found in inventory!")
+            st.warning("⚠ This item does not exist in inventory. Register it first!")
 
         st.session_state.inventory = inv
         save_inventory(inv)
-        st.success("Inventory updated successfully!")
+        st.success("Stock updated!")
 
 # ============================================================
-# TAB 3 — View Inventory
+# TAB 3 — Inventory View
 # ============================================================
 with tab3:
-    st.subheader("Inventory List")
-    st.dataframe(st.session_state.inventory, use_container_width=True)
+    st.subheader("Inventory List with Filters")
+
+    df = st.session_state.inventory.copy()
+
+    vc1, vc2, vc3 = st.columns(3)
+
+    with vc1:
+        f_cat = st.selectbox("Category", ["All"] + categories, key="view_cat")
+        if f_cat != "All"_
