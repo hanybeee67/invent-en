@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import date
+from datetime import date, datetime
+import io
 
 # ================= Page Config ==================
 st.set_page_config(
@@ -10,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================= Ingredient Database ==================
+# ================= Ingredient Database (기본 하드코딩 백업) ==================
 ingredient_list = [
     {"item": "Onion", "category": "Vegetable"},
     {"item": "Potato", "category": "Vegetable"},
@@ -34,6 +35,11 @@ ingredient_list = [
     {"item": "Ghee", "category": "Dairy"},
 ]
 
+# ================= Files ==================
+DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
+HISTORY_FILE = "stock_history.csv"        # 입출고 로그
+ITEM_FILE = "food ingrediants.txt"        # 카테고리/아이템/단위 DB
+
 # ================= Global CSS ==================
 st.markdown("""
 <style>
@@ -44,9 +50,46 @@ h1 {word-break:keep-all;}
 </style>
 """, unsafe_allow_html=True)
 
-# ================= Data Load / Save ==================
-DATA_FILE = "inventory_data.csv"
+# ================= Load item DB from file ==================
+def load_item_db():
+    """
+    food ingrediants.txt 형식:
+    Category<TAB>Item<TAB>Unit
+    """
+    if not os.path.exists(ITEM_FILE):
+        return []
 
+    items = []
+    with open(ITEM_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = [p.strip() for p in line.split("\t") if p.strip()]
+            if len(parts) >= 3:
+                cat, item, unit = parts[0], parts[1], parts[2]
+                items.append({"category": cat, "item": item, "unit": unit})
+    return items
+
+item_db = load_item_db()
+
+def get_all_categories():
+    if item_db:
+        return sorted(set([i["category"] for i in item_db]))
+    else:
+        return sorted(set([i["category"] for i in ingredient_list]))
+
+def get_items_by_category(category):
+    if item_db:
+        return sorted([i["item"] for i in item_db if i["category"] == category])
+    else:
+        return sorted([i["item"] for i in ingredient_list if i["category"] == category])
+
+def get_unit_for_item(category, item):
+    if item_db:
+        for i in item_db:
+            if i["category"] == category and i["item"] == item:
+                return i["unit"]
+    return ""  # 없으면 빈 문자열
+
+# ================= Data Load / Save ==================
 def load_inventory():
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
@@ -61,28 +104,56 @@ def load_inventory():
 def save_inventory(df):
     df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
 
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        df = pd.read_csv(HISTORY_FILE)
+        expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
+        for col in expected:
+            if col not in df.columns:
+                df[col] = ""
+        return df[expected]
+    else:
+        return pd.DataFrame(columns=["Date","Branch","Category","Item","Unit","Type","Qty"])
+
+def save_history(df):
+    df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
+
+# ================= Session Init ==================
 if "inventory" not in st.session_state:
     st.session_state.inventory = load_inventory()
 
+if "history" not in st.session_state:
+    st.session_state.history = load_history()
+
 branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
+categories = get_all_categories()
 
 # ================= Header ==================
 st.markdown(f"""
 <div class="card-header">
     <div>
         <h1>Everest Inventory Management System</h1>
-        <p>Manage stock by branch, date, category, and auto-classified items.</p>
+        <p>Manage stock by branch, date, category, item, and movement history.</p>
     </div>
     <div class="metric-card">
-        Total items stored: <b>{len(st.session_state.inventory)}</b>
+        Total inventory rows: <b>{len(st.session_state.inventory)}</b><br>
+        Total history rows: <b>{len(st.session_state.history)}</b>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ================= Tabs ==================
-tab1, tab2 = st.tabs(["✏ Register / Edit Inventory", "📊 View / Print Inventory"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "✏ Register / Edit Inventory",
+    "📊 View / Print Inventory",
+    "📦 IN / OUT Log",
+    "📈 Usage Analysis",
+    "📄 Monthly Report"
+])
 
-# ================= TAB 1: Register ==================
+# ======================================================
+# TAB 1: Register / Edit Inventory (아이템 선택 시 Unit 자동)
+# ======================================================
 with tab1:
     st.subheader("Register / Edit Inventory")
     
@@ -93,19 +164,21 @@ with tab1:
     
     with col1:
         branch = st.selectbox("Branch", branches, key="branch")
-        category = st.selectbox("Category", sorted(set([i["category"] for i in ingredient_list])), key="category")
+        category = st.selectbox("Category", categories, key="category")
     
     with col2:
         input_type = st.radio("Item Input", ["Select from list", "Type manually"], key="input_type")
         if input_type == "Select from list":
-            items = sorted([i["item"] for i in ingredient_list if i["category"] == category])
+            items = get_items_by_category(category)
             item = st.selectbox("Item name", items, key="item_name")
         else:
             item = st.text_input("Item name", key="item_name_manual")
 
-        # ---- TOP-DOWN UNIT SELECT ----
-        unit_options = ["kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]
-        unit = st.selectbox("Unit", unit_options, key="unit_select")
+        # ---- Unit 자동 세팅 + 선택 가능 ----
+        auto_unit = get_unit_for_item(category, item) if input_type == "Select from list" else ""
+        unit_options = ["", "kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]
+        default_index = unit_options.index(auto_unit) if auto_unit in unit_options else 0
+        unit = st.selectbox("Unit", unit_options, index=default_index, key="unit_select")
 
     with col3:
         qty = st.number_input("Current Quantity", min_value=0.0, step=1.0, key="qty")
@@ -123,13 +196,16 @@ with tab1:
         save_inventory(df)
         st.success("Saved Successfully!")
 
-# ================= TAB 2: View ==================
+# ======================================================
+# TAB 2: View / Print Inventory
+# ======================================================
 with tab2:
     st.subheader("View / Print Inventory")
     
     df = st.session_state.inventory.copy()
     
-    date_filter = st.date_input("Filter by Date", value=None, key="view_date")
+    # 날짜 필터
+    date_filter = st.date_input("Filter by Date", key="view_date")
     if date_filter:
         df = df[df["Date"] == str(date_filter)]
     
@@ -151,3 +227,191 @@ with tab2:
         mime="text/html",
         key="print_html"
     )
+
+# ======================================================
+# TAB 3: IN/OUT Log (날짜별 입·출고 기록 + 재고 자동 반영)
+# ======================================================
+with tab3:
+    st.subheader("Stock IN / OUT Log (Auto Update Inventory)")
+    
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        log_date = st.date_input("Date", value=date.today(), key="log_date")
+        log_branch = st.selectbox("Branch", branches, key="log_branch")
+    
+    with c2:
+        log_category = st.selectbox("Category", categories, key="log_category")
+        log_items = get_items_by_category(log_category)
+        log_item = st.selectbox("Item", log_items, key="log_item")
+    
+    with c3:
+        log_unit = get_unit_for_item(log_category, log_item)
+        st.write(f"Unit: **{log_unit or '-'}**")
+        log_type = st.selectbox("Type", ["IN", "OUT"], key="log_type")
+        log_qty = st.number_input("Quantity", min_value=0.0, step=1.0, key="log_qty")
+
+    if st.button("📥 Record IN / OUT", key="log_btn"):
+        # 1) 히스토리 저장
+        history_df = st.session_state.history.copy()
+        history_df.loc[len(history_df)] = [
+            str(log_date), log_branch, log_category, log_item, log_unit, log_type, log_qty
+        ]
+        st.session_state.history = history_df
+        save_history(history_df)
+
+        # 2) 재고 자동 반영
+        inv = st.session_state.inventory.copy()
+        mask = (inv["Branch"] == log_branch) & (inv["Item"] == log_item) & (inv["Category"] == log_category)
+        if mask.any():
+            if log_type == "IN":
+                inv.loc[mask, "CurrentQty"] = inv.loc[mask, "CurrentQty"] + log_qty
+            else:
+                inv.loc[mask, "CurrentQty"] = inv.loc[mask, "CurrentQty"] - log_qty
+        else:
+            # 기존 재고 없는 상태에서 IN이면 새로 생성
+            if log_type == "IN":
+                new_row = pd.DataFrame(
+                    [[log_branch, log_item, log_category, log_unit, log_qty, 0, "", str(log_date)]],
+                    columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+                )
+                inv = pd.concat([inv, new_row], ignore_index=True)
+            else:
+                st.warning("OUT인데 해당 재고가 없어서 수량은 반영되지 않았습니다.")
+
+        st.session_state.inventory = inv
+        save_inventory(inv)
+        st.success("IN / OUT recorded and inventory updated!")
+
+    st.markdown("### Recent Stock Movements")
+    st.dataframe(st.session_state.history.tail(50), use_container_width=True)
+
+# ======================================================
+# TAB 4: Usage Analysis (카테고리/지점별 사용량 분석)
+# ======================================================
+with tab4:
+    st.subheader("Usage Analysis (by Branch / Category / Item)")
+
+    history_df = st.session_state.history.copy()
+    if history_df.empty:
+        st.info("No history data yet.")
+    else:
+        history_df["DateObj"] = pd.to_datetime(history_df["Date"])
+
+        a1, a2, a3 = st.columns(3)
+        with a1:
+            sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
+        with a2:
+            sel_cat = st.selectbox("Category", ["All"] + categories, key="ana_cat")
+        with a3:
+            # 기간 선택 (월 단위)
+            year_options = sorted(set(history_df["DateObj"].dt.year))
+            sel_year = st.selectbox("Year", year_options, index=len(year_options)-1, key="ana_year")
+            sel_month = st.selectbox("Month", list(range(1,13)), index=datetime.now().month-1, key="ana_month")
+
+        # 필터 적용
+        filt = (history_df["DateObj"].dt.year == sel_year) & (history_df["DateObj"].dt.month == sel_month)
+        if sel_branch != "All":
+            filt &= (history_df["Branch"] == sel_branch)
+        if sel_cat != "All":
+            filt &= (history_df["Category"] == sel_cat)
+
+        use_df = history_df[filt]
+
+        if use_df.empty:
+            st.info("선택한 조건에 해당하는 데이터가 없습니다.")
+        else:
+            # OUT 기준 사용량 계산
+            out_df = use_df[use_df["Type"] == "OUT"]
+
+            st.markdown("#### Top Used Items (by OUT Quantity)")
+            item_usage = out_df.groupby(["Branch","Category","Item"])["Qty"].sum().reset_index()
+            item_usage = item_usage.sort_values("Qty", ascending=False)
+            st.dataframe(item_usage.head(20), use_container_width=True)
+
+            st.markdown("#### Category Usage (OUT Quantity)")
+            cat_usage = out_df.groupby(["Branch","Category"])["Qty"].sum().reset_index()
+            cat_usage = cat_usage.sort_values("Qty", ascending=False)
+            st.dataframe(cat_usage, use_container_width=True)
+
+# ======================================================
+# TAB 5: Monthly Report (Excel + PDF)
+# ======================================================
+with tab5:
+    st.subheader("📄 Monthly Stock Report (Excel + PDF)")
+
+    rep_year = st.number_input("Year", min_value=2020, max_value=2100, value=datetime.now().year, step=1, key="rep_year")
+    rep_month = st.number_input("Month", min_value=1, max_value=12, value=datetime.now().month, step=1, key="rep_month")
+
+    if st.button("Generate Monthly Report", key="rep_btn"):
+        inv = st.session_state.inventory.copy()
+        hist = st.session_state.history.copy()
+
+        # 날짜 처리
+        inv["DateObj"] = pd.to_datetime(inv["Date"], errors="coerce")
+        hist["DateObj"] = pd.to_datetime(hist["Date"], errors="coerce")
+
+        inv_m = inv[(inv["DateObj"].dt.year == rep_year) & (inv["DateObj"].dt.month == rep_month)]
+        hist_m = hist[(hist["DateObj"].dt.year == rep_year) & (hist["DateObj"].dt.month == rep_month)]
+
+        # 월간 사용량 (OUT 기준)
+        usage_m = pd.DataFrame()
+        if not hist_m.empty:
+            out_m = hist_m[hist_m["Type"] == "OUT"]
+            usage_m = out_m.groupby(["Branch","Category","Item"])["Qty"].sum().reset_index().sort_values("Qty", ascending=False)
+
+        # ===== Excel 생성 =====
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            inv_m.to_excel(writer, sheet_name="Inventory", index=False)
+            hist_m.to_excel(writer, sheet_name="IN_OUT_History", index=False)
+            if not usage_m.empty:
+                usage_m.to_excel(writer, sheet_name="Usage_TOP", index=False)
+        excel_buffer.seek(0)
+
+        st.download_button(
+            "⬇ Download Excel Report",
+            data=excel_buffer,
+            file_name=f"Everest_Report_{rep_year}_{rep_month}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="excel_dl"
+        )
+
+        # ===== PDF 생성 (간단 요약 / reportlab 필요) =====
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.pdfgen import canvas
+
+            pdf_buffer = io.BytesIO()
+            c = canvas.Canvas(pdf_buffer, pagesize=A4)
+            text = c.beginText(40, 800)
+            text.setFont("Helvetica", 11)
+
+            text.textLine(f"Everest Monthly Stock Report - {rep_year}-{rep_month:02d}")
+            text.textLine("")
+            text.textLine(f"Total inventory rows this month: {len(inv_m)}")
+            text.textLine(f"Total IN/OUT records this month: {len(hist_m)}")
+            text.textLine("")
+
+            if not usage_m.empty:
+                text.textLine("Top Used Items (OUT):")
+                for _, row in usage_m.head(10).iterrows():
+                    line = f"- {row['Branch']} / {row['Category']} / {row['Item']}: {row['Qty']}"
+                    text.textLine(line)
+            else:
+                text.textLine("No OUT records this month.")
+
+            c.drawText(text)
+            c.showPage()
+            c.save()
+            pdf_buffer.seek(0)
+
+            st.download_button(
+                "⬇ Download PDF Summary",
+                data=pdf_buffer,
+                file_name=f"Everest_Report_{rep_year}_{rep_month}.pdf",
+                mime="application/pdf",
+                key="pdf_dl"
+            )
+        except Exception:
+            st.info("PDF 생성을 위해서는 requirements.txt 에 'reportlab' 패키지를 추가해야 합니다.")
