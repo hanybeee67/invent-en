@@ -89,31 +89,36 @@ with tab1:
     col0, col1, col2, col3 = st.columns(4)
     
     with col0:
-        selected_date = st.date_input("📅 Date", value=date.today())
+        selected_date = st.date_input("📅 Date", value=date.today(), key="selected_date")
     
     with col1:
-        branch = st.selectbox("Branch", branches)
-        category = st.selectbox("Category", sorted(set([i["category"] for i in ingredient_list])))
+        branch = st.selectbox("Branch", branches, key="branch")
+        category = st.selectbox("Category", sorted(set([i["category"] for i in ingredient_list])), key="category")
     
     with col2:
-        input_type = st.radio("Item Input", ["Select from list", "Type manually"])
+        input_type = st.radio("Item Input", ["Select from list", "Type manually"], key="input_type")
         if input_type == "Select from list":
             items = sorted([i["item"] for i in ingredient_list if i["category"] == category])
-            item = st.selectbox("Item name", items)
+            item = st.selectbox("Item name", items, key="item_name")
         else:
-            item = st.text_input("Item name")
-        unit = st.text_input("Unit (kg, pcs, box)")
-    
-    with col3:
-        qty = st.number_input("Current Quantity", min_value=0.0, step=1.0)
-        min_qty = st.number_input("Minimum Required", min_value=0.0, step=1.0)
-        note = st.text_input("Note")
+            item = st.text_input("Item name", key="item_name_manual")
 
-    if st.button("💾 Save / Update"):
+        # ---- TOP-DOWN UNIT SELECT ----
+        unit_options = ["kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]
+        unit = st.selectbox("Unit", unit_options, key="unit_select")
+
+    with col3:
+        qty = st.number_input("Current Quantity", min_value=0.0, step=1.0, key="qty")
+        min_qty = st.number_input("Minimum Required", min_value=0.0, step=1.0, key="min_qty")
+        note = st.text_input("Note", key="note")
+
+    if st.button("💾 Save / Update", key="save_btn"):
         df = st.session_state.inventory.copy()
-        new_row = pd.DataFrame([[branch, item, category, unit, qty, min_qty, note, str(selected_date)]],
-                               columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"])
-        df = pd.concat([df,new_row], ignore_index=True)
+        new_row = pd.DataFrame(
+            [[branch, item, category, unit, qty, min_qty, note, str(selected_date)]],
+            columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+        )
+        df = pd.concat([df, new_row], ignore_index=True)
         st.session_state.inventory = df
         save_inventory(df)
         st.success("Saved Successfully!")
@@ -124,22 +129,25 @@ with tab2:
     
     df = st.session_state.inventory.copy()
     
-    date_filter = st.date_input("Filter by Date", value=None)
+    date_filter = st.date_input("Filter by Date", value=None, key="view_date")
     if date_filter:
         df = df[df["Date"] == str(date_filter)]
     
-    category_filter = st.selectbox("Category", ["All"] + sorted(set(df["Category"])))
+    category_filter = st.selectbox("Category", ["All"] + sorted(set(df["Category"])), key="view_cat")
     if category_filter != "All":
         df = df[df["Category"] == category_filter]
     
-    item_filter = st.selectbox("Item", ["All"] + sorted(set(df["Item"])))
+    item_filter = st.selectbox("Item", ["All"] + sorted(set(df["Item"])), key="view_item")
     if item_filter != "All":
         df = df[df["Item"] == item_filter]
     
     st.dataframe(df, use_container_width=True)
     
     printable_html = df.to_html(index=False)
-    st.download_button("🖨 Download Printable HTML",
-                       data=f"<html><body>{printable_html}</body></html>",
-                       file_name="inventory_print.html",
-                       mime="text/html")
+    st.download_button(
+        "🖨 Download Printable HTML",
+        data=f"<html><body>{printable_html}</body></html>",
+        file_name="inventory_print.html",
+        mime="text/html",
+        key="print_html"
+    )
