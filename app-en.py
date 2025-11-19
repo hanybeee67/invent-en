@@ -238,4 +238,3 @@ with tab4:
 
     plt.colorbar(im)
     st.pyplot(fig)
-
