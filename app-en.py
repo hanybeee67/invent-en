@@ -3,7 +3,6 @@ import pandas as pd
 import os
 from datetime import date, datetime
 import plotly.express as px
-import plotly.graph_objects as go
 import calendar
 import numpy as np
 import io
@@ -15,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================= Ingredient Database ==================
+# ================= Ingredient List ==================
 ingredient_list = [
     {"item": "Onion", "category": "Vegetable"},
     {"item": "Potato", "category": "Vegetable"},
@@ -43,38 +42,46 @@ ingredient_list = [
 st.markdown("""
 <style>
 .stApp {background-color:#111827; color:#e5e7eb;}
-.metric-card {background:#1f2937; padding:12px 18px; border-radius:10px; border:1px solid #4b5563;}
+.metric-card {background:#1f2937; padding:12px 18px; border-radius:10px; border:1px solid #374151;}
 </style>
 """, unsafe_allow_html=True)
 
-# ================= Data Files ==================
+# ================= File Paths ==================
 INV_FILE = "inventory_data.csv"
 HIS_FILE = "history_data.csv"
 
-# ================= Load / Save ==================
+# ================= Load Inventory ==================
 def load_inventory():
+    cols = ["Branch", "Item", "Category", "Unit",
+            "CurrentQty", "MinQty", "Note", "Date"]
+
     if os.path.exists(INV_FILE):
         df = pd.read_csv(INV_FILE)
-        cols = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
         for c in cols:
             if c not in df.columns:
                 df[c] = ""
-        return df
+        return df[cols]
+
     return pd.DataFrame(columns=cols)
 
+# ================= Save Inventory ==================
 def save_inventory(df):
     df.to_csv(INV_FILE, index=False, encoding="utf-8-sig")
 
+# ================= Load History ==================
 def load_history():
+    cols = ["Date", "Branch", "Item", "Type", "Qty"]
+
     if os.path.exists(HIS_FILE):
         df = pd.read_csv(HIS_FILE)
-        cols = ["Date","Branch","Item","Type","Qty"]
         for c in cols:
             if c not in df.columns:
                 df[c] = ""
-        return df
+        return df[cols]
+
     return pd.DataFrame(columns=cols)
 
+# ================= Save History ==================
 def save_history(df):
     df.to_csv(HIS_FILE, index=False, encoding="utf-8-sig")
 
@@ -85,16 +92,12 @@ if "inventory" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = load_history()
 
-branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
+branches = ["동대문", "굿모닝시티", "양재", "수원영통", "동탄", "영등포", "룸비니"]
 
 # ================= Header ==================
 st.markdown("""
-<div style="display:flex; justify-content:space-between;">
-    <div>
-        <h1>Everest Inventory Management System</h1>
-        <p>Enhanced with Heatmap, Auto IN/OUT, and Monthly Excel Reporting</p>
-    </div>
-</div>
+<h1>Everest Inventory Management System</h1>
+<p>Advanced stock system with auto updates, heatmap, and reporting</p>
 """, unsafe_allow_html=True)
 
 # ================= Tabs ==================
@@ -122,8 +125,8 @@ with tab1:
         category = st.selectbox("Category", sorted(set(i["category"] for i in ingredient_list)))
 
     with col2:
-        input_type = st.radio("Item Input", ["Select from list", "Type manually"])
-        if input_type == "Select from list":
+        mode = st.radio("Item Input", ["Select from list", "Type manually"])
+        if mode == "Select from list":
             items = sorted([i["item"] for i in ingredient_list if i["category"] == category])
             item = st.selectbox("Item", items)
         else:
@@ -133,7 +136,7 @@ with tab1:
 
     with col3:
         qty = st.number_input("Current Qty", min_value=0.0, step=1.0)
-        min_qty = st.number_input("Minimum Required", min_value=0.0, step=1.0)
+        min_qty = st.number_input("Minimum Qty", min_value=0.0, step=1.0)
         note = st.text_input("Note")
 
     if st.button("💾 Save Inventory"):
@@ -143,7 +146,7 @@ with tab1:
         ]
         st.session_state.inventory = df
         save_inventory(df)
-        st.success("Saved successfully!")
+        st.success("Saved")
 
 # ============================================================
 # TAB 2 — View Inventory
@@ -156,29 +159,29 @@ with tab2:
     date_filter = st.date_input("Filter by Date")
     df = df[df["Date"] == str(date_filter)]
 
-    cat_filter = st.selectbox("Category", ["All"] + sorted(set(df["Category"])))
+    cat_filter = st.selectbox("Category", ["All"] + sorted(df["Category"].unique()))
     if cat_filter != "All":
         df = df[df["Category"] == cat_filter]
 
-    item_filter = st.selectbox("Item", ["All"] + sorted(set(df["Item"])))
+    item_filter = st.selectbox("Item", ["All"] + sorted(df["Item"].unique()))
     if item_filter != "All":
         df = df[df["Item"] == item_filter]
 
     st.dataframe(df, use_container_width=True)
 
-    printable_html = df.to_html(index=False)
+    printable = df.to_html(index=False)
     st.download_button(
         "🖨 Download Printable HTML",
-        data=f"<html><body>{printable_html}</body></html>",
-        file_name="inventory_print.html",
+        f"<html><body>{printable}</body></html>",
+        "inventory_print.html",
         mime="text/html"
     )
 
 # ============================================================
-# TAB 3 — Stock IN/OUT with Auto Inventory Update
+# TAB 3 — Stock IN/OUT + Auto Update
 # ============================================================
 with tab3:
-    st.subheader("Stock IN / OUT (Auto Adjust Inventory)")
+    st.subheader("Stock IN / OUT (Auto Update Inventory)")
 
     col1, col2, col3 = st.columns(3)
 
@@ -193,14 +196,14 @@ with tab3:
     with col3:
         log_qty = st.number_input("Quantity", min_value=0.0, step=1.0)
 
-    if st.button("📥 Log Stock Movement & Auto Update"):
-        # 1) Add to history
+    if st.button("📥 Log & Update"):
+        # 기록 저장
         his = st.session_state.history.copy()
         his.loc[len(his)] = [str(log_date), log_branch, log_item, log_type, log_qty]
         st.session_state.history = his
         save_history(his)
 
-        # 2) Auto adjust inventory
+        # 재고 자동 반영
         inv = st.session_state.inventory.copy()
         mask = (inv["Branch"] == log_branch) & (inv["Item"] == log_item)
 
@@ -210,36 +213,34 @@ with tab3:
             else:
                 inv.loc[mask, "CurrentQty"] -= log_qty
 
-            # 경고: 재고가 음수가 되면 표시
             if any(inv.loc[mask, "CurrentQty"] < 0):
-                st.warning("⚠ Stock reduced below zero!")
+                st.warning("⚠ Stock went below 0!")
         else:
             st.warning("Item not found in inventory. Register it first.")
 
         st.session_state.inventory = inv
         save_inventory(inv)
 
-        st.success("Stock movement recorded & inventory updated!")
+        st.success("IN/OUT recorded & inventory updated!")
 
-    st.markdown("### Stock Movement History")
     st.dataframe(st.session_state.history, use_container_width=True)
 
 # ============================================================
-# TAB 4 — Heatmap Visualization (Beautiful Layout)
+# TAB 4 — Heatmap Visualization
 # ============================================================
 with tab4:
-    st.subheader("Monthly Heatmap — Stock Activity")
+    st.subheader("Monthly Stock Activity Heatmap")
 
     df = st.session_state.history.copy()
 
-    month = st.selectbox("Month", range(1, 13), index=datetime.now().month - 1)
-    year = st.selectbox("Year", range(2022, 2031), index=3)
+    month = st.selectbox("Month", list(range(1, 13)), index=datetime.now().month - 1)
+    year = st.selectbox("Year", list(range(2022, 2031)), index=3)
 
     df["d"] = pd.to_datetime(df["Date"])
     df = df[(df["d"].dt.month == month) & (df["d"].dt.year == year)]
 
     if len(df) == 0:
-        st.info("No activity recorded for this month.")
+        st.info("No activity this month.")
     else:
         df["weekday"] = df["d"].dt.weekday
         df["day"] = df["d"].dt.day
@@ -256,50 +257,48 @@ with tab4:
         )
 
         fig.update_layout(
-            width=900,
-            height=500,
             xaxis=dict(
                 tickmode="array",
-                tickvals=[0, 1, 2, 3, 4, 5, 6],
-                ticktext=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                tickvals=[0,1,2,3,4,5,6],
+                ticktext=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
             )
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================
-# TAB 5 — Monthly Excel Report
+# TAB 5 — Monthly Report (Excel)
 # ============================================================
 with tab5:
     st.subheader("📄 Generate Monthly Excel Report")
 
-    rep_month = st.selectbox("Report Month", range(1, 13), index=datetime.now().month - 1)
-    rep_year = st.selectbox("Report Year", range(2022, 2031), index=3)
+    rep_month = st.selectbox("Report Month", list(range(1, 13)), index=datetime.now().month - 1)
+    rep_year = st.selectbox("Report Year", list(range(2022, 2031)), index=3)
 
-    if st.button("📥 Generate Report"):
+    if st.button("⬇ Download Monthly Excel Report"):
         inv = st.session_state.inventory.copy()
         his = st.session_state.history.copy()
 
         inv["d"] = pd.to_datetime(inv["Date"])
         his["d"] = pd.to_datetime(his["Date"])
 
-        inv_month = inv[(inv["d"].dt.month == rep_month) & (inv["d"].dt.year == rep_year)]
-        his_month = his[(his["d"].dt.month == rep_month) & (his["d"].dt.year == rep_year)]
+        inv_m = inv[(inv["d"].dt.month == rep_month) & (inv["d"].dt.year == rep_year)]
+        his_m = his[(his["d"].dt.month == rep_month) & (his["d"].dt.year == rep_year)]
 
-        low_stock = inv_month[inv_month["CurrentQty"] <= inv_month["MinQty"]]
+        low_stock = inv_m[inv_m["CurrentQty"] <= inv_m["MinQty"]]
 
         with io.BytesIO() as buffer:
             with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-                inv_month.to_excel(writer, sheet_name="Inventory", index=False)
-                his_month.to_excel(writer, sheet_name="IN_OUT_Log", index=False)
-                low_stock.to_excel(writer, sheet_name="LowStock", index=False)
+                inv_m.to_excel(writer, sheet_name="Inventory", index=False)
+                his_m.to_excel(writer, sheet_name="IN_OUT Log", index=False)
+                low_stock.to_excel(writer, sheet_name="Low Stock", index=False)
 
-            excel_data = buffer.getvalue()
+            excel_binary = buffer.getvalue()
 
         st.download_button(
-            label="⬇ Download Monthly Report (Excel)",
-            data=excel_data,
+            "⬇ Download Excel",
+            excel_binary,
             file_name=f"Everest_Report_{rep_year}-{rep_month}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        st.success("Monthly report generated!")
+        st.success("Report generated!")
