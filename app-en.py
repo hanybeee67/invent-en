@@ -143,12 +143,13 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ================= Tabs ==================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "✏ Register / Edit Inventory",
     "📊 View / Print Inventory",
     "📦 IN / OUT Log",
     "📈 Usage Analysis",
-    "📄 Monthly Report"
+    "📄 Monthly Report",
+    "💾 Data Management"
 ])
 
 # ======================================================
@@ -415,3 +416,72 @@ with tab5:
             )
         except Exception:
             st.info("PDF 생성을 위해서는 requirements.txt 에 'reportlab' 패키지를 추가해야 합니다.")
+
+# ======================================================
+# TAB 6: Data Management (Bulk Import)
+# ======================================================
+with tab6:
+    st.subheader("💾 Data Management / Settings")
+    
+    st.markdown("### 1. Bulk Import Ingredients")
+    st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
+
+    # 1. 템플릿 다운로드
+    sample_data = [
+        {"Category": "Vegetable", "Item": "Onion", "Unit": "kg"},
+        {"Category": "Meat", "Item": "Chicken", "Unit": "kg"},
+        {"Category": "Sauce", "Item": "Soy Sauce", "Unit": "L"},
+    ]
+    sample_df = pd.DataFrame(sample_data)
+    
+    template_buffer = io.BytesIO()
+    with pd.ExcelWriter(template_buffer, engine="openpyxl") as writer:
+        sample_df.to_excel(writer, index=False)
+    template_buffer.seek(0)
+    
+    st.download_button(
+        label="⬇ Download Excel Template",
+        data=template_buffer,
+        file_name="ingredient_template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="dl_template"
+    )
+
+    # 2. 파일 업로드 및 처리
+    uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
+    
+    if uploaded_file is not None:
+        try:
+            new_df = pd.read_excel(uploaded_file)
+            st.write("Preview of uploaded data:")
+            st.dataframe(new_df.head(), use_container_width=True)
+            
+            # 유효성 검사
+            required_cols = ["Category", "Item", "Unit"]
+            if not all(col in new_df.columns for col in required_cols):
+                st.error(f"Excel file must contain columns: {required_cols}")
+            else:
+                if st.button("✅ Apply to Database", key="apply_db"):
+                    # 파일로 저장 (food ingrediants.txt)
+                    # 기존 형식: Category<TAB>Item<TAB>Unit
+                    with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                        for _, row in new_df.iterrows():
+                            # 탭이나 줄바꿈 문자 제거
+                            cat = str(row["Category"]).strip()
+                            item = str(row["Item"]).strip()
+                            unit = str(row["Unit"]).strip()
+                            if cat and item:
+                                f.write(f"{cat}\t{item}\t{unit}\n")
+                    
+                    # 메모리 갱신
+                    # item_db, categories 변수 등은 리로드 필요
+                    # 가장 쉬운 방법은 캐시 날리거나, rerun.
+                    # 여기서는 app 재실행 유도 또는 직접 갱신
+                    st.success("Successfully updated! Please refresh the page to reflect changes.")
+                    
+                    # session_state 갱신 시도 (optional)
+                    # item_db = load_item_db() # 전역이라 즉시 반영 안될 수 있음, rerun 권장
+                    st.stop() # Rerun to reload
+
+        except Exception as e:
+            st.error(f"Error processing file: {e}")
