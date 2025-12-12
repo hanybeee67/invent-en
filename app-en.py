@@ -38,7 +38,10 @@ ingredient_list = [
 # ================= Files ==================
 DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
 HISTORY_FILE = "stock_history.csv"        # 입출고 로그
-ITEM_FILE = "food ingrediants.txt"        # 카테고리/아이템/단위 DB
+# ================= Files ==================
+DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
+HISTORY_FILE = "stock_history.csv"        # 입출고 로그
+ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
 
 # ================= Global CSS ==================
 st.markdown("""
@@ -53,7 +56,7 @@ h1 {word-break:keep-all;}
 # ================= Load item DB from file ==================
 def load_item_db():
     """
-    food ingrediants.txt 형식:
+    food ingredients.txt 형식:
     Category<TAB>Item<TAB>Unit
     """
     if not os.path.exists(ITEM_FILE):
@@ -137,6 +140,12 @@ with st.sidebar:
     st.title("User Info")
     role = st.session_state.role
     st.info(f"Logged in as: **{role.upper()}**")
+    
+    # Debug Info
+    if item_db:
+        st.caption(f"Loaded {len(item_db)} items from file.")
+    else:
+        st.caption(f"Using default list ({len(ingredient_list)} items).")
 
     if role == "staff":
         with st.expander("🔐 Manager Login"):
