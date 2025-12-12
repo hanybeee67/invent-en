@@ -456,10 +456,16 @@ with tab6:
             st.write("Preview of uploaded data:")
             st.dataframe(new_df.head(), use_container_width=True)
             
-            # 유효성 검사
+            # 유효성 검사 (Relaxed Validation)
+            # 1. 컬럼명 정규화 (공백제거, Title Case 변환)
+            # 예: " category " -> "Category", "item" -> "Item"
+            new_df.columns = [c.strip().title() for c in new_df.columns]
+
             required_cols = ["Category", "Item", "Unit"]
-            if not all(col in new_df.columns for col in required_cols):
-                st.error(f"Excel file must contain columns: {required_cols}")
+            missing_cols = [col for col in required_cols if col not in new_df.columns]
+
+            if missing_cols:
+                st.error(f"Excel file must contain columns: {required_cols}. Missing: {missing_cols}")
             else:
                 if st.button("✅ Apply to Database", key="apply_db"):
                     # 파일로 저장 (food ingrediants.txt)
