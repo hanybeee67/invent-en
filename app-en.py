@@ -358,16 +358,71 @@ if tab1:
             min_qty = st.number_input("Minimum Required", min_value=0.0, step=1.0, key="min_qty")
             note = st.text_input("Note", key="note")
 
-        if st.button("💾 Save / Update", key="save_btn"):
-            df = st.session_state.inventory.copy()
-            new_row = pd.DataFrame(
-                [[branch, item, category, unit, qty, min_qty, note, str(selected_date)]],
-                columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
-            )
-            df = pd.concat([df, new_row], ignore_index=True)
-            st.session_state.inventory = df
-            save_inventory(df)
-            st.success("Saved Successfully!")
+        # ---- 기존 데이터 확인 로직 ----
+        df_curr = st.session_state.inventory
+        mask = (df_curr["Branch"] == branch) & (df_curr["Category"] == category) & (df_curr["Item"] == item)
+        existing_row = df_curr[mask]
+        
+        is_update = False
+        if not existing_row.empty:
+            is_update = True
+            # Load data if key changed
+            full_key = f"{branch}_{category}_{item}"
+            if "last_loaded_key" not in st.session_state:
+                st.session_state.last_loaded_key = ""
+            
+            if st.session_state.last_loaded_key != full_key:
+                st.session_state["qty"] = float(existing_row.iloc[0]["CurrentQty"])
+                st.session_state["min_qty"] = float(existing_row.iloc[0]["MinQty"])
+                st.session_state["note"] = str(existing_row.iloc[0]["Note"])
+                st.session_state.last_loaded_key = full_key
+                st.rerun()
+        else:
+            # Reset if new
+            full_key = f"{branch}_{category}_{item}"
+            if "last_loaded_key" not in st.session_state:
+                st.session_state.last_loaded_key = ""
+            if st.session_state.last_loaded_key != full_key:
+                st.session_state["qty"] = 0.0
+                st.session_state["min_qty"] = 0.0
+                st.session_state["note"] = ""
+                st.session_state.last_loaded_key = full_key
+                st.rerun()
+
+        # 버튼 영역
+        b_col1, b_col2 = st.columns(2)
+        
+        with b_col1:
+            btn_label = "💾 Update Inventory" if is_update else "💾 Register New"
+            if st.button(btn_label, key="save_btn"):
+                df = st.session_state.inventory.copy()
+                if is_update:
+                    df.loc[mask, "CurrentQty"] = qty
+                    df.loc[mask, "MinQty"] = min_qty
+                    df.loc[mask, "Note"] = note
+                    df.loc[mask, "Date"] = str(selected_date)
+                    df.loc[mask, "Unit"] = unit 
+                    st.success("Updated Successfully!")
+                else:
+                    new_row = pd.DataFrame(
+                        [[branch, item, category, unit, qty, min_qty, note, str(selected_date)]],
+                        columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+                    )
+                    df = pd.concat([df, new_row], ignore_index=True)
+                    st.success("Registered Successfully!")
+                st.session_state.inventory = df
+                save_inventory(df)
+        
+        with b_col2:
+            if is_update:
+                if st.button("🗑 Delete Item", key="del_btn", type="primary"):
+                    df = st.session_state.inventory.copy()
+                    df = df[~mask]
+                    st.session_state.inventory = df
+                    save_inventory(df)
+                    st.warning("Item Deleted.")
+                    st.session_state.last_loaded_key = ""
+                    st.rerun()
 
 # ======================================================
 # TAB 2: View / Print Inventory (All)
