@@ -47,17 +47,18 @@ ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-def check_login():
+def check_login(key_suffix):
     """
     Returns True if logged in, False if not (and shows login form).
+    key_suffix: unique string for widget keys (e.g., "tab4")
     """
     if st.session_state["logged_in"]:
         return True
 
     st.warning("🔒 Manager Login Required")
-    password = st.text_input("Password", type="password", key="login_pw")
+    password = st.text_input("Password", type="password", key=f"login_pw_{key_suffix}")
     
-    if st.button("Login", key="login_btn_internal"):
+    if st.button("Login", key=f"login_btn_{key_suffix}"):
         if password == "1234":
             st.session_state["logged_in"] = True
             st.rerun()
@@ -334,48 +335,48 @@ with tab3:
 with tab4:
     st.subheader("Usage Analysis (by Branch / Category / Item)")
     
-    if check_login():
+    if check_login("tab4"):
         history_df = st.session_state.history.copy()
-    if history_df.empty:
-        st.info("No history data yet.")
-    else:
-        history_df["DateObj"] = pd.to_datetime(history_df["Date"])
-
-        a1, a2, a3 = st.columns(3)
-        with a1:
-            sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
-        with a2:
-            sel_cat = st.selectbox("Category", ["All"] + categories, key="ana_cat")
-        with a3:
-            # 기간 선택 (월 단위)
-            year_options = sorted(set(history_df["DateObj"].dt.year))
-            sel_year = st.selectbox("Year", year_options, index=len(year_options)-1, key="ana_year")
-            sel_month = st.selectbox("Month", list(range(1,13)), index=datetime.now().month-1, key="ana_month")
-
-        # 필터 적용
-        filt = (history_df["DateObj"].dt.year == sel_year) & (history_df["DateObj"].dt.month == sel_month)
-        if sel_branch != "All":
-            filt &= (history_df["Branch"] == sel_branch)
-        if sel_cat != "All":
-            filt &= (history_df["Category"] == sel_cat)
-
-        use_df = history_df[filt]
-
-        if use_df.empty:
-            st.info("선택한 조건에 해당하는 데이터가 없습니다.")
+        if history_df.empty:
+            st.info("No history data yet.")
         else:
-            # OUT 기준 사용량 계산
-            out_df = use_df[use_df["Type"] == "OUT"]
+            history_df["DateObj"] = pd.to_datetime(history_df["Date"])
 
-            st.markdown("#### Top Used Items (by OUT Quantity)")
-            item_usage = out_df.groupby(["Branch","Category","Item"])["Qty"].sum().reset_index()
-            item_usage = item_usage.sort_values("Qty", ascending=False)
-            st.dataframe(item_usage.head(20), use_container_width=True)
+            a1, a2, a3 = st.columns(3)
+            with a1:
+                sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
+            with a2:
+                sel_cat = st.selectbox("Category", ["All"] + categories, key="ana_cat")
+            with a3:
+                # 기간 선택 (월 단위)
+                year_options = sorted(set(history_df["DateObj"].dt.year))
+                sel_year = st.selectbox("Year", year_options, index=len(year_options)-1, key="ana_year")
+                sel_month = st.selectbox("Month", list(range(1,13)), index=datetime.now().month-1, key="ana_month")
 
-            st.markdown("#### Category Usage (OUT Quantity)")
-            cat_usage = out_df.groupby(["Branch","Category"])["Qty"].sum().reset_index()
-            cat_usage = cat_usage.sort_values("Qty", ascending=False)
-            st.dataframe(cat_usage, use_container_width=True)
+            # 필터 적용
+            filt = (history_df["DateObj"].dt.year == sel_year) & (history_df["DateObj"].dt.month == sel_month)
+            if sel_branch != "All":
+                filt &= (history_df["Branch"] == sel_branch)
+            if sel_cat != "All":
+                filt &= (history_df["Category"] == sel_cat)
+
+            use_df = history_df[filt]
+
+            if use_df.empty:
+                st.info("선택한 조건에 해당하는 데이터가 없습니다.")
+            else:
+                # OUT 기준 사용량 계산
+                out_df = use_df[use_df["Type"] == "OUT"]
+
+                st.markdown("#### Top Used Items (by OUT Quantity)")
+                item_usage = out_df.groupby(["Branch","Category","Item"])["Qty"].sum().reset_index()
+                item_usage = item_usage.sort_values("Qty", ascending=False)
+                st.dataframe(item_usage.head(20), use_container_width=True)
+
+                st.markdown("#### Category Usage (OUT Quantity)")
+                cat_usage = out_df.groupby(["Branch","Category"])["Qty"].sum().reset_index()
+                cat_usage = cat_usage.sort_values("Qty", ascending=False)
+                st.dataframe(cat_usage, use_container_width=True)
 
 # ======================================================
 # TAB 5: Monthly Report (Manager Only)
@@ -384,82 +385,82 @@ if tab5:
     with tab5:
         st.subheader("📄 Monthly Stock Report (Excel + PDF)")
         
-        if check_login():
+        if check_login("tab5"):
             rep_year = st.number_input("Year", min_value=2020, max_value=2100, value=datetime.now().year, step=1, key="rep_year")
-        rep_month = st.number_input("Month", min_value=1, max_value=12, value=datetime.now().month, step=1, key="rep_month")
+            rep_month = st.number_input("Month", min_value=1, max_value=12, value=datetime.now().month, step=1, key="rep_month")
 
-        if st.button("Generate Monthly Report", key="rep_btn"):
-            inv = st.session_state.inventory.copy()
-            hist = st.session_state.history.copy()
+            if st.button("Generate Monthly Report", key="rep_btn"):
+                inv = st.session_state.inventory.copy()
+                hist = st.session_state.history.copy()
 
-            # 날짜 처리
-            inv["DateObj"] = pd.to_datetime(inv["Date"], errors="coerce")
-            hist["DateObj"] = pd.to_datetime(hist["Date"], errors="coerce")
+                # 날짜 처리
+                inv["DateObj"] = pd.to_datetime(inv["Date"], errors="coerce")
+                hist["DateObj"] = pd.to_datetime(hist["Date"], errors="coerce")
 
-            inv_m = inv[(inv["DateObj"].dt.year == rep_year) & (inv["DateObj"].dt.month == rep_month)]
-            hist_m = hist[(hist["DateObj"].dt.year == rep_year) & (hist["DateObj"].dt.month == rep_month)]
+                inv_m = inv[(inv["DateObj"].dt.year == rep_year) & (inv["DateObj"].dt.month == rep_month)]
+                hist_m = hist[(hist["DateObj"].dt.year == rep_year) & (hist["DateObj"].dt.month == rep_month)]
 
-            # 월간 사용량 (OUT 기준)
-            usage_m = pd.DataFrame()
-            if not hist_m.empty:
-                out_m = hist_m[hist_m["Type"] == "OUT"]
-                usage_m = out_m.groupby(["Branch","Category","Item"])["Qty"].sum().reset_index().sort_values("Qty", ascending=False)
+                # 월간 사용량 (OUT 기준)
+                usage_m = pd.DataFrame()
+                if not hist_m.empty:
+                    out_m = hist_m[hist_m["Type"] == "OUT"]
+                    usage_m = out_m.groupby(["Branch","Category","Item"])["Qty"].sum().reset_index().sort_values("Qty", ascending=False)
 
-            # ===== Excel 생성 =====
-            excel_buffer = io.BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-                inv_m.to_excel(writer, sheet_name="Inventory", index=False)
-                hist_m.to_excel(writer, sheet_name="IN_OUT_History", index=False)
-                if not usage_m.empty:
-                    usage_m.to_excel(writer, sheet_name="Usage_TOP", index=False)
-            excel_buffer.seek(0)
-
-            st.download_button(
-                "⬇ Download Excel Report",
-                data=excel_buffer,
-                file_name=f"Everest_Report_{rep_year}_{rep_month}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="excel_dl"
-            )
-
-            # ===== PDF 생성 (간단 요약 / reportlab 필요) =====
-            try:
-                from reportlab.lib.pagesizes import A4
-                from reportlab.pdfgen import canvas
-
-                pdf_buffer = io.BytesIO()
-                c = canvas.Canvas(pdf_buffer, pagesize=A4)
-                text = c.beginText(40, 800)
-                text.setFont("Helvetica", 11)
-
-                text.textLine(f"Everest Monthly Stock Report - {rep_year}-{rep_month:02d}")
-                text.textLine("")
-                text.textLine(f"Total inventory rows this month: {len(inv_m)}")
-                text.textLine(f"Total IN/OUT records this month: {len(hist_m)}")
-                text.textLine("")
-
-                if not usage_m.empty:
-                    text.textLine("Top Used Items (OUT):")
-                    for _, row in usage_m.head(10).iterrows():
-                        line = f"- {row['Branch']} / {row['Category']} / {row['Item']}: {row['Qty']}"
-                        text.textLine(line)
-                else:
-                    text.textLine("No OUT records this month.")
-
-                c.drawText(text)
-                c.showPage()
-                c.save()
-                pdf_buffer.seek(0)
+                # ===== Excel 생성 =====
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                    inv_m.to_excel(writer, sheet_name="Inventory", index=False)
+                    hist_m.to_excel(writer, sheet_name="IN_OUT_History", index=False)
+                    if not usage_m.empty:
+                        usage_m.to_excel(writer, sheet_name="Usage_TOP", index=False)
+                excel_buffer.seek(0)
 
                 st.download_button(
-                    "⬇ Download PDF Summary",
-                    data=pdf_buffer,
-                    file_name=f"Everest_Report_{rep_year}_{rep_month}.pdf",
-                    mime="application/pdf",
-                    key="pdf_dl"
+                    "⬇ Download Excel Report",
+                    data=excel_buffer,
+                    file_name=f"Everest_Report_{rep_year}_{rep_month}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="excel_dl"
                 )
-            except Exception:
-                st.info("PDF 생성을 위해서는 requirements.txt 에 'reportlab' 패키지를 추가해야 합니다.")
+
+                # ===== PDF 생성 (간단 요약 / reportlab 필요) =====
+                try:
+                    from reportlab.lib.pagesizes import A4
+                    from reportlab.pdfgen import canvas
+
+                    pdf_buffer = io.BytesIO()
+                    c = canvas.Canvas(pdf_buffer, pagesize=A4)
+                    text = c.beginText(40, 800)
+                    text.setFont("Helvetica", 11)
+
+                    text.textLine(f"Everest Monthly Stock Report - {rep_year}-{rep_month:02d}")
+                    text.textLine("")
+                    text.textLine(f"Total inventory rows this month: {len(inv_m)}")
+                    text.textLine(f"Total IN/OUT records this month: {len(hist_m)}")
+                    text.textLine("")
+
+                    if not usage_m.empty:
+                        text.textLine("Top Used Items (OUT):")
+                        for _, row in usage_m.head(10).iterrows():
+                            line = f"- {row['Branch']} / {row['Category']} / {row['Item']}: {row['Qty']}"
+                            text.textLine(line)
+                    else:
+                        text.textLine("No OUT records this month.")
+
+                    c.drawText(text)
+                    c.showPage()
+                    c.save()
+                    pdf_buffer.seek(0)
+
+                    st.download_button(
+                        "⬇ Download PDF Summary",
+                        data=pdf_buffer,
+                        file_name=f"Everest_Report_{rep_year}_{rep_month}.pdf",
+                        mime="application/pdf",
+                        key="pdf_dl"
+                    )
+                except Exception:
+                    st.info("PDF 생성을 위해서는 requirements.txt 에 'reportlab' 패키지를 추가해야 합니다.")
 
 # ======================================================
 # TAB 6: Data Management (Bulk Import) (Manager Only)
@@ -468,72 +469,72 @@ if tab6:
     with tab6:
         st.subheader("💾 Data Management / Settings")
         
-        if check_login():
+        if check_login("tab6"):
             st.markdown("### 1. Bulk Import Ingredients")
-        st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
+            st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
 
-        # 1. 템플릿 다운로드
-        sample_data = [
-            {"Category": "Vegetable", "Item": "Onion", "Unit": "kg"},
-            {"Category": "Meat", "Item": "Chicken", "Unit": "kg"},
-            {"Category": "Sauce", "Item": "Soy Sauce", "Unit": "L"},
-        ]
-        sample_df = pd.DataFrame(sample_data)
-        
-        template_buffer = io.BytesIO()
-        with pd.ExcelWriter(template_buffer, engine="openpyxl") as writer:
-            sample_df.to_excel(writer, index=False)
-        template_buffer.seek(0)
-        
-        st.download_button(
-            label="⬇ Download Excel Template",
-            data=template_buffer,
-            file_name="ingredient_template.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="dl_template"
-        )
+            # 1. 템플릿 다운로드
+            sample_data = [
+                {"Category": "Vegetable", "Item": "Onion", "Unit": "kg"},
+                {"Category": "Meat", "Item": "Chicken", "Unit": "kg"},
+                {"Category": "Sauce", "Item": "Soy Sauce", "Unit": "L"},
+            ]
+            sample_df = pd.DataFrame(sample_data)
+            
+            template_buffer = io.BytesIO()
+            with pd.ExcelWriter(template_buffer, engine="openpyxl") as writer:
+                sample_df.to_excel(writer, index=False)
+            template_buffer.seek(0)
+            
+            st.download_button(
+                label="⬇ Download Excel Template",
+                data=template_buffer,
+                file_name="ingredient_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_template"
+            )
 
-        # 2. 파일 업로드 및 처리
-        uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
-        
-        if uploaded_file is not None:
-            try:
-                new_df = pd.read_excel(uploaded_file)
-                st.write("Preview of uploaded data:")
-                st.dataframe(new_df.head(), use_container_width=True)
-                
-                # 유효성 검사 (Relaxed Validation)
-                # 1. 컬럼명 정규화 (공백제거, Title Case 변환)
-                # 예: " category " -> "Category", "item" -> "Item"
-                new_df.columns = [c.strip().title() for c in new_df.columns]
+            # 2. 파일 업로드 및 처리
+            uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
+            
+            if uploaded_file is not None:
+                try:
+                    new_df = pd.read_excel(uploaded_file)
+                    st.write("Preview of uploaded data:")
+                    st.dataframe(new_df.head(), use_container_width=True)
+                    
+                    # 유효성 검사 (Relaxed Validation)
+                    # 1. 컬럼명 정규화 (공백제거, Title Case 변환)
+                    # 예: " category " -> "Category", "item" -> "Item"
+                    new_df.columns = [c.strip().title() for c in new_df.columns]
 
-                required_cols = ["Category", "Item", "Unit"]
-                missing_cols = [col for col in required_cols if col not in new_df.columns]
+                    required_cols = ["Category", "Item", "Unit"]
+                    missing_cols = [col for col in required_cols if col not in new_df.columns]
 
-                if missing_cols:
-                    st.error(f"Excel file must contain columns: {required_cols}. Missing: {missing_cols}")
-                else:
-                    if st.button("✅ Apply to Database", key="apply_db"):
-                        # 파일로 저장 (food ingrediants.txt)
-                        # 기존 형식: Category<TAB>Item<TAB>Unit
-                        with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                            for _, row in new_df.iterrows():
-                                # 탭이나 줄바꿈 문자 제거
-                                cat = str(row["Category"]).strip()
-                                item = str(row["Item"]).strip()
-                                unit = str(row["Unit"]).strip()
-                                if cat and item:
-                                    f.write(f"{cat}\t{item}\t{unit}\n")
-                        
-                        # 메모리 갱신
-                        # item_db, categories 변수 등은 리로드 필요
-                        # 가장 쉬운 방법은 캐시 날리거나, rerun.
-                        # 여기서는 app 재실행 유도 또는 직접 갱신
-                        st.success("Successfully updated! Please refresh the page to reflect changes.")
-                        
-                        # session_state 갱신 시도 (optional)
-                        # item_db = load_item_db() # 전역이라 즉시 반영 안될 수 있음, rerun 권장
-                        st.stop() # Rerun to reload
+                    if missing_cols:
+                        st.error(f"Excel file must contain columns: {required_cols}. Missing: {missing_cols}")
+                    else:
+                        if st.button("✅ Apply to Database", key="apply_db"):
+                            # 파일로 저장 (food ingrediants.txt)
+                            # 기존 형식: Category<TAB>Item<TAB>Unit
+                            with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                                for _, row in new_df.iterrows():
+                                    # 탭이나 줄바꿈 문자 제거
+                                    cat = str(row["Category"]).strip()
+                                    item = str(row["Item"]).strip()
+                                    unit = str(row["Unit"]).strip()
+                                    if cat and item:
+                                        f.write(f"{cat}\t{item}\t{unit}\n")
+                            
+                            # 메모리 갱신
+                            # item_db, categories 변수 등은 리로드 필요
+                            # 가장 쉬운 방법은 캐시 날리거나, rerun.
+                            # 여기서는 app 재실행 유도 또는 직접 갱신
+                            st.success("Successfully updated! Please refresh the page to reflect changes.")
+                            
+                            # session_state 갱신 시도 (optional)
+                            # item_db = load_item_db() # 전역이라 즉시 반영 안될 수 있음, rerun 권장
+                            st.stop() # Rerun to reload
 
-            except Exception as e:
-                st.error(f"Error processing file: {e}")
+                except Exception as e:
+                    st.error(f"Error processing file: {e}")
