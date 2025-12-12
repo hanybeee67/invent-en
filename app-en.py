@@ -43,6 +43,27 @@ DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
 HISTORY_FILE = "stock_history.csv"        # 입출고 로그
 ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
 
+# ================= Login Logic ==================
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+def login_page():
+    st.title("Everest Inventory - Login")
+    
+    # 간단한 패스워드 입력
+    password = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        if password == "1234":  # 임시 비밀번호: 1234
+            st.session_state["logged_in"] = True
+            st.rerun()
+        else:
+            st.error("Incorrect Password")
+
+if not st.session_state["logged_in"]:
+    login_page()
+    st.stop()
+
 # ================= Global CSS ==================
 st.markdown("""
 <style>
