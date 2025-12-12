@@ -139,40 +139,11 @@ if "inventory" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = load_history()
 
-# Default role: Staff
-if "role" not in st.session_state:
-    st.session_state.role = "staff"
+# Default role: Staff (REMOVED)
+# ...
 
 branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
 categories = get_all_categories()
-
-# ================= Sidebar Login ==================
-with st.sidebar:
-    st.title("User Info")
-    role = st.session_state.role
-    st.info(f"Logged in as: **{role.upper()}**")
-    
-    # Debug Info
-    if item_db:
-        st.caption(f"Loaded {len(item_db)} items from file.")
-    else:
-        st.caption(f"Using default list ({len(ingredient_list)} items).")
-
-    if role == "staff":
-        with st.expander("🔐 Manager Login"):
-            login_id = st.text_input("ID")
-            login_pw = st.text_input("Password", type="password")
-            if st.button("Login"):
-                if login_id == "admin" and login_pw == "1234":
-                    st.session_state.role = "manager"
-                    st.success("Login Success!")
-                    st.rerun()
-                else:
-                    st.error("Invalid credentials")
-    else:
-        if st.button("Logout"):
-            st.session_state.role = "staff"
-            st.rerun()
 
 # ================= Header ==================
 st.markdown(f"""
@@ -189,29 +160,14 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ================= Tabs ==================
-# Manager와 Staff가 보는 탭이 다름
-# Staff: View, IN/OUT, Usage Analysis (Tab 1, 5, 6 Hidden)
-# Manager: All Tabs
-
-role = st.session_state.role
-
-if role == "manager":
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "✏ Register / Edit Inventory",
-        "📊 View / Print Inventory",
-        "📦 IN / OUT Log",
-        "📈 Usage Analysis",
-        "📄 Monthly Report",
-        "💾 Data Management"
-    ])
-else:
-    # Staff는 3개 탭만 보임 -> 인덱스 매핑 필요
-    tab2, tab3, tab4 = st.tabs([
-        "📊 View / Print Inventory",
-        "📦 IN / OUT Log",
-        "📈 Usage Analysis"
-    ])
-    tab1, tab5, tab6 = None, None, None
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "✏ Register / Edit Inventory",
+    "📊 View / Print Inventory",
+    "📦 IN / OUT Log",
+    "📈 Usage Analysis",
+    "📄 Monthly Report",
+    "💾 Data Management"
+])
 
 # ======================================================
 # TAB 1: Register / Edit Inventory (Manager Only)
