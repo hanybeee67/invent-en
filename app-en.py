@@ -353,41 +353,44 @@ if tab1:
                 
             unit = st.selectbox("Unit", unit_options, index=default_index, key="unit_select")
 
-        with col3:
-            qty = st.number_input("Current Quantity", min_value=0.0, step=1.0, key="qty")
-            min_qty = st.number_input("Minimum Required", min_value=0.0, step=1.0, key="min_qty")
-            note = st.text_input("Note", key="note")
-
-        # ---- 기존 데이터 확인 로직 ----
+        # ---- 기존 데이터 확인 로직 (위젯 렌더링 전에 실행해야 함) ----
         df_curr = st.session_state.inventory
         mask = (df_curr["Branch"] == branch) & (df_curr["Category"] == category) & (df_curr["Item"] == item)
         existing_row = df_curr[mask]
         
         is_update = False
-        if not existing_row.empty:
-            is_update = True
-            # Load data if key changed
-            full_key = f"{branch}_{category}_{item}"
-            if "last_loaded_key" not in st.session_state:
-                st.session_state.last_loaded_key = ""
-            
-            if st.session_state.last_loaded_key != full_key:
+        full_key = f"{branch}_{category}_{item}"
+        
+        # Session State 키 초기화
+        if "last_loaded_key" not in st.session_state:
+            st.session_state.last_loaded_key = ""
+        
+        # 아이템 변경 감지 -> 데이터 로드 또는 초기화
+        if st.session_state.last_loaded_key != full_key:
+            if not existing_row.empty:
+                # DB 값 불러오기
                 st.session_state["qty"] = float(existing_row.iloc[0]["CurrentQty"])
                 st.session_state["min_qty"] = float(existing_row.iloc[0]["MinQty"])
                 st.session_state["note"] = str(existing_row.iloc[0]["Note"])
-                st.session_state.last_loaded_key = full_key
-                st.rerun()
-        else:
-            # Reset if new
-            full_key = f"{branch}_{category}_{item}"
-            if "last_loaded_key" not in st.session_state:
-                st.session_state.last_loaded_key = ""
-            if st.session_state.last_loaded_key != full_key:
+            else:
+                # 신규 -> 초기화
                 st.session_state["qty"] = 0.0
                 st.session_state["min_qty"] = 0.0
                 st.session_state["note"] = ""
-                st.session_state.last_loaded_key = full_key
-                st.rerun()
+            
+            st.session_state.last_loaded_key = full_key
+            # 값을 설정했으므로, 아래 위젯들이 이 값을 물고 렌더링됨.
+            # 하지만 확실한 UI 갱신을 위해 rerun 할 수도 있으나, 
+            # widget key가 설정된 상태에서 값 update후 렌더링이면 반영됨.
+
+        if not existing_row.empty:
+            is_update = True
+
+        with col3:
+            # key="qty" 등을 사용할 때 session_state에 값이 있으면 그 값을 초기값으로 사용
+            qty = st.number_input("Current Quantity", min_value=0.0, step=1.0, key="qty")
+            min_qty = st.number_input("Minimum Required", min_value=0.0, step=1.0, key="min_qty")
+            note = st.text_input("Note", key="note")
 
         # 버튼 영역
         b_col1, b_col2 = st.columns(2)
