@@ -58,32 +58,43 @@ def load_item_db():
     """
     food ingredients.txt 형식:
     Category<TAB>Item<TAB>Unit
+    
+    기본 ingredient_list와 파일 내용을 병합하여 반환함.
     """
-    if not os.path.exists(ITEM_FILE):
-        return []
-
     items = []
-    with open(ITEM_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            parts = [p.strip() for p in line.split("\t") if p.strip()]
-            if len(parts) >= 3:
-                cat, item, unit = parts[0], parts[1], parts[2]
-                items.append({"category": cat, "item": item, "unit": unit})
+    
+    # 1. 파일 로드
+    if os.path.exists(ITEM_FILE):
+        with open(ITEM_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = [p.strip() for p in line.split("\t") if p.strip()]
+                if len(parts) >= 3:
+                    cat, item, unit = parts[0], parts[1], parts[2]
+                    items.append({"category": cat, "item": item, "unit": unit})
+    
+    # 2. 기본 리스트(ingredient_list) 병합 (중복 방지)
+    # 파일에 있는 것이 우선(Unit 정보가 있을 수 있으므로)
+    existing_keys = set((i["category"], i["item"]) for i in items)
+    
+    for default in ingredient_list:
+        if (default["category"], default["item"]) not in existing_keys:
+            # 기본 리스트에는 Unit이 없으므로 빈 문자열 할당
+            items.append({
+                "category": default["category"], 
+                "item": default["item"], 
+                "unit": "" 
+            })
+            
     return items
 
 item_db = load_item_db()
 
 def get_all_categories():
-    if item_db:
-        return sorted(set([i["category"] for i in item_db]))
-    else:
-        return sorted(set([i["category"] for i in ingredient_list]))
+    # item_db가 이제 항상 채워져 있으므로 바로 사용
+    return sorted(set([i["category"] for i in item_db]))
 
 def get_items_by_category(category):
-    if item_db:
-        return sorted([i["item"] for i in item_db if i["category"] == category])
-    else:
-        return sorted([i["item"] for i in ingredient_list if i["category"] == category])
+    return sorted([i["item"] for i in item_db if i["category"] == category])
 
 def get_unit_for_item(category, item):
     if item_db:
