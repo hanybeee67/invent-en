@@ -276,6 +276,21 @@ with col_h2:
 
 st.markdown("---")
 
+# ================= Low Stock Alert ==================
+if not st.session_state.inventory.empty:
+    # Ensure numeric columns
+    inv_df = st.session_state.inventory.copy()
+    inv_df["CurrentQty"] = pd.to_numeric(inv_df["CurrentQty"], errors="coerce").fillna(0)
+    inv_df["MinQty"] = pd.to_numeric(inv_df["MinQty"], errors="coerce").fillna(0)
+    
+    # Check condition: CurrentQty <= MinQty AND MinQty > 0
+    low_stock = inv_df[(inv_df["CurrentQty"] <= inv_df["MinQty"]) & (inv_df["MinQty"] > 0)]
+    
+    if not low_stock.empty:
+        st.error(f"⚠️ Warning: {len(low_stock)} items are below minimum stock level!", icon="🚨")
+        with st.expander("View Low Stock Items"):
+            st.dataframe(low_stock[["Branch", "Category", "Item", "CurrentQty", "MinQty", "Unit"]], use_container_width=True)
+
 # ================= Tabs ==================
 
 # ================= Tabs ==================
