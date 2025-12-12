@@ -255,59 +255,28 @@ branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영�
 categories = get_all_categories()
 
 # ================= Header (Logo + Title) ==================
-col_h1, col_h2 = st.columns([1, 5])
+# 로고와 제목 간격을 좁히기 위해 컬럼 비율 조정 ([1, 8] 정도로 로고 영역 작게)
+col_h1, col_h2 = st.columns([1, 8])
 
 with col_h1:
     if os.path.exists("logo_circle.png"):
-        st.image("logo_circle.png", width=120)       
+        # 로고 크기도 약간 조정 가능하지만 우선 유지
+        st.image("logo_circle.png", width=100)       
     else:
-        # Fallback if logo script failed
         st.markdown("<div style='font-size:4rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
 
 with col_h2:
+    # margin-top 조정으로 수직 정렬 맞춤
     st.markdown("""
-    <div style="margin-top: 10px;">
-        <h1 class="title-text">Everest Inventory</h1>
+    <div style="margin-top: 5px;">
+        <h1 class="title-text" style="font-size: 2.5rem;">Everest Inventory</h1>
         <p class="subtitle-text">Professional Stock Management System</p>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ================= Dashboard Metrics ==================
-m1, m2, m3, m4 = st.columns(4)
-with m1:
-    st.markdown(f"""
-    <div class="metric-box">
-        <div class="metric-label">Total Items</div>
-        <div class="metric-value">{len(st.session_state.inventory)}</div>
-    </div>
-    """, unsafe_allow_html=True)
-with m2:
-    st.markdown(f"""
-    <div class="metric-box">
-        <div class="metric-label">History Records</div>
-        <div class="metric-value">{len(st.session_state.history)}</div>
-    </div>
-    """, unsafe_allow_html=True)
-with m3:
-    # 예시: 오늘 입력 건수
-    today_cnt = len(st.session_state.history[st.session_state.history['Date'] == str(date.today())])
-    st.markdown(f"""
-    <div class="metric-box">
-        <div class="metric-label">Today's Activity</div>
-        <div class="metric-value">{today_cnt}</div>
-    </div>
-    """, unsafe_allow_html=True)
-with m4:
-    st.markdown(f"""
-    <div class="metric-box">
-        <div class="metric-label">System Status</div>
-        <div class="metric-value" style="color:#4ade80;">Active</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
+# ================= Tabs ==================
 
 # ================= Tabs ==================
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
