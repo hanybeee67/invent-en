@@ -220,7 +220,26 @@ if tab1:
             # ---- Unit 자동 세팅 + 선택 가능 ----
             auto_unit = get_unit_for_item(category, item) if input_type == "Select from list" else ""
             unit_options = ["", "kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]
-            default_index = unit_options.index(auto_unit) if auto_unit in unit_options else 0
+            
+            # 아이템이 변경되었는지 확인하여 unit_select 강제 업데이트
+            current_item_key = f"last_item_{category}_{item}"
+            if "last_selected_item" not in st.session_state:
+                st.session_state.last_selected_item = ""
+
+            # 아이템이 변경되었다면 (또는 초기 진입)
+            if st.session_state.last_selected_item != item:
+                if auto_unit in unit_options:
+                    st.session_state["unit_select"] = auto_unit
+                else:
+                    st.session_state["unit_select"] = unit_options[0]
+                st.session_state.last_selected_item = item
+
+            # default_index는 이제 초기 렌더링에만 영향, 실제 값은 session_state가 지배
+            try:
+                default_index = unit_options.index(st.session_state.get("unit_select", ""))
+            except ValueError:
+                default_index = 0
+                
             unit = st.selectbox("Unit", unit_options, index=default_index, key="unit_select")
 
         with col3:
