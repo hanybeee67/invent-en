@@ -46,13 +46,115 @@ def check_login(key_suffix):
     
     return False
 
-# ================= Global CSS ==================
+# ================= Global CSS (Premium UI) ==================
 st.markdown("""
 <style>
-/* .stApp background is handled by config.toml now */
-h1 {word-break:keep-all;}
-.card-header {display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;}
-.metric-card {background:#1f2937; padding:12px 18px; border-radius:10px; border:1px solid #4b5563;}
+/* 1. Fonts & Colors */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Outfit', sans-serif;
+    color: #e2e8f0;
+}
+.stApp {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* 2. Header Area */
+.header-container {
+    display: flex;
+    align-items: center;
+    padding: 20px 0;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #334155;
+}
+.logo-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin-right: 20px;
+    border: 3px solid #38bdf8;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+}
+.title-text {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: -webkit-linear-gradient(45deg, #f8fafc, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+.subtitle-text {
+    font-size: 1rem;
+    color: #94a3b8;
+    margin-top: 5px;
+}
+
+/* 3. Card & Metrics */
+.metric-container {
+    display: flex;
+    gap: 20px;
+}
+.metric-box {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 15px 25px;
+    flex: 1;
+    text-align: center;
+}
+.metric-label {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin-bottom: 5px;
+}
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #38bdf8;
+}
+
+/* 4. Tabs Customization */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 10px;
+    border-bottom: 1px solid #334155;
+}
+.stTabs [data-baseweb="tab"] {
+    height: 50px;
+    border-radius: 8px 8px 0 0;
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: #94a3b8;
+    font-weight: 500;
+}
+.stTabs [aria-selected="true"] {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-bottom: none;
+    color: #38bdf8;
+}
+
+/* 5. Inputs & Buttons */
+.stTextInput > div > div > input, .stSelectbox > div > div > div, .stNumberInput > div > div > input {
+    background-color: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid #475569;
+    border-radius: 8px;
+}
+.stButton > button {
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+.stButton > button:hover {
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    transform: translateY(-2px);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -152,19 +254,60 @@ if "history" not in st.session_state:
 branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
 categories = get_all_categories()
 
-# ================= Header ==================
-st.markdown(f"""
-<div class="card-header">
-    <div>
-        <h1>Everest Inventory Management System</h1>
-        <p>Manage stock by branch, date, category, item, and movement history.</p>
+# ================= Header (Logo + Title) ==================
+col_h1, col_h2 = st.columns([1, 5])
+
+with col_h1:
+    if os.path.exists("logo_circle.png"):
+        st.image("logo_circle.png", width=120)       
+    else:
+        # Fallback if logo script failed
+        st.markdown("<div style='font-size:4rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
+
+with col_h2:
+    st.markdown("""
+    <div style="margin-top: 10px;">
+        <h1 class="title-text">Everest Inventory</h1>
+        <p class="subtitle-text">Professional Stock Management System</p>
     </div>
-    <div class="metric-card">
-        Total inventory rows: <b>{len(st.session_state.inventory)}</b><br>
-        Total history rows: <b>{len(st.session_state.history)}</b>
+    """, unsafe_allow_html=True)
+
+st.markdown("---")
+
+# ================= Dashboard Metrics ==================
+m1, m2, m3, m4 = st.columns(4)
+with m1:
+    st.markdown(f"""
+    <div class="metric-box">
+        <div class="metric-label">Total Items</div>
+        <div class="metric-value">{len(st.session_state.inventory)}</div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+with m2:
+    st.markdown(f"""
+    <div class="metric-box">
+        <div class="metric-label">History Records</div>
+        <div class="metric-value">{len(st.session_state.history)}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with m3:
+    # 예시: 오늘 입력 건수
+    today_cnt = len(st.session_state.history[st.session_state.history['Date'] == str(date.today())])
+    st.markdown(f"""
+    <div class="metric-box">
+        <div class="metric-label">Today's Activity</div>
+        <div class="metric-value">{today_cnt}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with m4:
+    st.markdown(f"""
+    <div class="metric-box">
+        <div class="metric-label">System Status</div>
+        <div class="metric-value" style="color:#4ade80;">Active</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ================= Tabs ==================
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([

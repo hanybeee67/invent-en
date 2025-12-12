@@ -13,10 +13,10 @@ try:
     width, height = img.size
     min_dim = min(width, height)
     
-    left = (width - min_dim) / 2
-    top = (height - min_dim) / 2
-    right = (width + min_dim) / 2
-    bottom = (height + min_dim) / 2
+    left = int((width - min_dim) / 2)
+    top = int((height - min_dim) / 2)
+    right = int(left + min_dim)
+    bottom = int(top + min_dim)
     
     img = img.crop((left, top, right, bottom))
     
