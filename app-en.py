@@ -252,6 +252,11 @@ with tab2:
     if date_filter:
         df = df[df["Date"] == str(date_filter)]
     
+    # 지점 필터 (추가됨)
+    branch_filter = st.selectbox("Branch", ["All"] + branches, key="view_branch")
+    if branch_filter != "All":
+        df = df[df["Branch"] == branch_filter]
+    
     category_filter = st.selectbox("Category", ["All"] + sorted(set(df["Category"])), key="view_cat")
     if category_filter != "All":
         df = df[df["Category"] == category_filter]
