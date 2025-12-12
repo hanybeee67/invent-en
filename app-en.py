@@ -12,28 +12,7 @@ st.set_page_config(
 )
 
 # ================= Ingredient Database (기본 하드코딩 백업) ==================
-ingredient_list = [
-    {"item": "Onion", "category": "Vegetable", "unit": "kg"},
-    {"item": "Potato", "category": "Vegetable", "unit": "kg"},
-    {"item": "Carrot", "category": "Vegetable", "unit": "kg"},
-    {"item": "Tomato", "category": "Vegetable", "unit": "kg"},
-    {"item": "Cabbage", "category": "Vegetable", "unit": "kg"},
-    {"item": "Capsicum", "category": "Vegetable", "unit": "kg"},
-    {"item": "Garlic", "category": "Vegetable", "unit": "kg"},
-    {"item": "Chicken breast", "category": "Meat / Poultry", "unit": "kg"},
-    {"item": "Chicken drumstick", "category": "Meat / Poultry", "unit": "kg"},
-    {"item": "Prawn", "category": "Seafood", "unit": "kg"},
-    {"item": "Mixed seafood", "category": "Seafood", "unit": "kg"},
-    {"item": "Flour", "category": "Grain / Flour", "unit": "kg"},
-    {"item": "Rice", "category": "Grain / Rice", "unit": "kg"},
-    {"item": "Dal", "category": "Grain / Pulse", "unit": "kg"},
-    {"item": "Chick peas", "category": "Grain / Pulse", "unit": "kg"},
-    {"item": "Tomato ketchup", "category": "Sauce / Dressing", "unit": "kg"},
-    {"item": "Soy sauce", "category": "Sauce / Dressing", "unit": "L"},
-    {"item": "Milk", "category": "Dairy", "unit": "L"},
-    {"item": "Cooking cream", "category": "Dairy", "unit": "L"},
-    {"item": "Ghee", "category": "Dairy", "unit": "kg"},
-]
+ingredient_list = []
 
 # ================= Files ==================
 DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
@@ -116,6 +95,10 @@ item_db = load_item_db()
 def get_all_categories():
     # item_db가 이제 항상 채워져 있으므로 바로 사용
     return sorted(set([i["category"] for i in item_db]))
+
+def get_all_units():
+    # item_db에서 사용된 모든 Unit 추출 (빈 값 제외)
+    return sorted(set([i["unit"] for i in item_db if i["unit"]]))
 
 def get_items_by_category(category):
     return sorted([i["item"] for i in item_db if i["category"] == category])
@@ -219,7 +202,8 @@ if tab1:
 
             # ---- Unit 자동 세팅 + 선택 가능 ----
             auto_unit = get_unit_for_item(category, item) if input_type == "Select from list" else ""
-            unit_options = ["", "kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]
+            # unit_options = ["", "kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]  # Old hardcoded
+            unit_options = [""] + get_all_units()  # Dynamic from DB
             
             # 아이템이 변경되었는지 확인하여 unit_select 강제 업데이트
             current_item_key = f"last_item_{category}_{item}"
