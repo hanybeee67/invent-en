@@ -43,7 +43,7 @@ ITEM_FILE = "food ingrediants.txt"        # 카테고리/아이템/단위 DB
 # ================= Global CSS ==================
 st.markdown("""
 <style>
-.stApp {background-color:#111827; color:#e5e7eb;}
+/* .stApp background is handled by config.toml now */
 h1 {word-break:keep-all;}
 .card-header {display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center;}
 .metric-card {background:#1f2937; padding:12px 18px; border-radius:10px; border:1px solid #4b5563;}
