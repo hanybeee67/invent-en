@@ -13,26 +13,26 @@ st.set_page_config(
 
 # ================= Ingredient Database (기본 하드코딩 백업) ==================
 ingredient_list = [
-    {"item": "Onion", "category": "Vegetable"},
-    {"item": "Potato", "category": "Vegetable"},
-    {"item": "Carrot", "category": "Vegetable"},
-    {"item": "Tomato", "category": "Vegetable"},
-    {"item": "Cabbage", "category": "Vegetable"},
-    {"item": "Capsicum", "category": "Vegetable"},
-    {"item": "Garlic", "category": "Vegetable"},
-    {"item": "Chicken breast", "category": "Meat / Poultry"},
-    {"item": "Chicken drumstick", "category": "Meat / Poultry"},
-    {"item": "Prawn", "category": "Seafood"},
-    {"item": "Mixed seafood", "category": "Seafood"},
-    {"item": "Flour", "category": "Grain / Flour"},
-    {"item": "Rice", "category": "Grain / Rice"},
-    {"item": "Dal", "category": "Grain / Pulse"},
-    {"item": "Chick peas", "category": "Grain / Pulse"},
-    {"item": "Tomato ketchup", "category": "Sauce / Dressing"},
-    {"item": "Soy sauce", "category": "Sauce / Dressing"},
-    {"item": "Milk", "category": "Dairy"},
-    {"item": "Cooking cream", "category": "Dairy"},
-    {"item": "Ghee", "category": "Dairy"},
+    {"item": "Onion", "category": "Vegetable", "unit": "kg"},
+    {"item": "Potato", "category": "Vegetable", "unit": "kg"},
+    {"item": "Carrot", "category": "Vegetable", "unit": "kg"},
+    {"item": "Tomato", "category": "Vegetable", "unit": "kg"},
+    {"item": "Cabbage", "category": "Vegetable", "unit": "kg"},
+    {"item": "Capsicum", "category": "Vegetable", "unit": "kg"},
+    {"item": "Garlic", "category": "Vegetable", "unit": "kg"},
+    {"item": "Chicken breast", "category": "Meat / Poultry", "unit": "kg"},
+    {"item": "Chicken drumstick", "category": "Meat / Poultry", "unit": "kg"},
+    {"item": "Prawn", "category": "Seafood", "unit": "kg"},
+    {"item": "Mixed seafood", "category": "Seafood", "unit": "kg"},
+    {"item": "Flour", "category": "Grain / Flour", "unit": "kg"},
+    {"item": "Rice", "category": "Grain / Rice", "unit": "kg"},
+    {"item": "Dal", "category": "Grain / Pulse", "unit": "kg"},
+    {"item": "Chick peas", "category": "Grain / Pulse", "unit": "kg"},
+    {"item": "Tomato ketchup", "category": "Sauce / Dressing", "unit": "kg"},
+    {"item": "Soy sauce", "category": "Sauce / Dressing", "unit": "L"},
+    {"item": "Milk", "category": "Dairy", "unit": "L"},
+    {"item": "Cooking cream", "category": "Dairy", "unit": "L"},
+    {"item": "Ghee", "category": "Dairy", "unit": "kg"},
 ]
 
 # ================= Files ==================
@@ -102,11 +102,11 @@ def load_item_db():
     
     for default in ingredient_list:
         if (default["category"], default["item"]) not in existing_keys:
-            # 기본 리스트에는 Unit이 없으므로 빈 문자열 할당
+            # 기본 리스트의 unit 사용
             items.append({
                 "category": default["category"], 
                 "item": default["item"], 
-                "unit": "" 
+                "unit": default.get("unit", "") 
             })
             
     return items
