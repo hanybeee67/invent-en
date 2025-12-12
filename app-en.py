@@ -47,22 +47,24 @@ ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-def login_page():
-    st.title("Everest Inventory - Login")
+def check_login():
+    """
+    Returns True if logged in, False if not (and shows login form).
+    """
+    if st.session_state["logged_in"]:
+        return True
+
+    st.warning("🔒 Manager Login Required")
+    password = st.text_input("Password", type="password", key="login_pw")
     
-    # 간단한 패스워드 입력
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        if password == "1234":  # 임시 비밀번호: 1234
+    if st.button("Login", key="login_btn_internal"):
+        if password == "1234":
             st.session_state["logged_in"] = True
             st.rerun()
         else:
             st.error("Incorrect Password")
-
-if not st.session_state["logged_in"]:
-    login_page()
-    st.stop()
+    
+    return False
 
 # ================= Global CSS ==================
 st.markdown("""
@@ -331,8 +333,9 @@ with tab3:
 # ======================================================
 with tab4:
     st.subheader("Usage Analysis (by Branch / Category / Item)")
-
-    history_df = st.session_state.history.copy()
+    
+    if check_login():
+        history_df = st.session_state.history.copy()
     if history_df.empty:
         st.info("No history data yet.")
     else:
@@ -380,8 +383,9 @@ with tab4:
 if tab5:
     with tab5:
         st.subheader("📄 Monthly Stock Report (Excel + PDF)")
-
-        rep_year = st.number_input("Year", min_value=2020, max_value=2100, value=datetime.now().year, step=1, key="rep_year")
+        
+        if check_login():
+            rep_year = st.number_input("Year", min_value=2020, max_value=2100, value=datetime.now().year, step=1, key="rep_year")
         rep_month = st.number_input("Month", min_value=1, max_value=12, value=datetime.now().month, step=1, key="rep_month")
 
         if st.button("Generate Monthly Report", key="rep_btn"):
@@ -464,7 +468,8 @@ if tab6:
     with tab6:
         st.subheader("💾 Data Management / Settings")
         
-        st.markdown("### 1. Bulk Import Ingredients")
+        if check_login():
+            st.markdown("### 1. Bulk Import Ingredients")
         st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
 
         # 1. 템플릿 다운로드
