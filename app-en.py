@@ -20,7 +20,7 @@ if not st.session_state["splash_shown"]:
     st.markdown("""
     <style>
     .stApp {
-        background-image: url("app/static/everest_background_blur.png"); /* Fallback if local hosting varies */
+        background-image: url("app/static/everest_splash_bg.jpg"); /* Fallback if local hosting varies */
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -36,21 +36,21 @@ if not st.session_state["splash_shown"]:
         align-items: center;
         height: 80vh;
         text-align: center;
-        color: white;
+        color: #0f172a; /* Darker text color requested */
         animation: fadeIn 1.5s ease-in-out;
     }
     .splash-title {
         font-size: 3.5rem;
         font-weight: 800;
-        text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        text-shadow: 0 4px 10px rgba(255,255,255,0.5); /* Light shadow for dark text */
         margin-bottom: 1rem;
     }
     .splash-subtitle {
         font-size: 1.2rem;
-        font-weight: 400;
-        color: #e2e8f0;
+        font-weight: 600;
+        color: #1e293b; /* Dark slate */
         margin-bottom: 3rem;
-        text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        text-shadow: 0 2px 5px rgba(255,255,255,0.5);
     }
     .enter-btn {
         margin-top: 20px;
@@ -74,13 +74,13 @@ if not st.session_state["splash_shown"]:
             data = f.read()
         return base64.b64encode(data).decode()
 
-    bg_img_path = "everest_background_blur.png"
+    bg_img_path = "everest_splash_bg.jpg"
     if os.path.exists(bg_img_path):
         bin_str = get_base64_of_bin_file(bg_img_path)
         page_bg_img = f'''
         <style>
         .stApp {{
-            background-image: url("data:image/png;base64,{bin_str}");
+            background-image: url("data:image/jpeg;base64,{bin_str}");
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -91,7 +91,7 @@ if not st.session_state["splash_shown"]:
 
     st.markdown("""
         <div class="splash-container">
-            <div class="splash-title">Everest Inventory</div>
+            <div class="splash-title">Everest Restaurant Inventory</div>
             <div class="splash-subtitle">Professional Stock Management System</div>
         </div>
     """, unsafe_allow_html=True)
