@@ -60,24 +60,24 @@ html, body, [class*="css"] {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
-/* 2. Header Area */
+/* 2. Compact Header Area */
 .header-container {
     display: flex;
     align-items: center;
-    padding: 20px 0;
-    margin-bottom: 30px;
+    padding: 10px 0; /* Reduced padding */
+    margin-bottom: 10px; /* Reduced margin */
     border-bottom: 2px solid #334155;
 }
 .logo-img {
-    width: 60px;
-    height: 60px;
+    width: 40px; /* Smaller logo */
+    height: 40px;
     border-radius: 50%;
-    margin-right: 20px;
-    border: 3px solid #38bdf8;
-    box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+    margin-right: 15px;
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
 }
 .title-text {
-    font-size: 2.2rem;
+    font-size: 1.5rem; /* Smaller title */
     font-weight: 700;
     background: -webkit-linear-gradient(45deg, #f8fafc, #94a3b8);
     -webkit-background-clip: text;
@@ -85,9 +85,9 @@ html, body, [class*="css"] {
     margin: 0;
 }
 .subtitle-text {
-    font-size: 1rem;
+    font-size: 0.8rem; /* Smaller subtitle */
     color: #94a3b8;
-    margin-top: 5px;
+    margin-top: 2px;
 }
 
 /* 3. Card & Metrics */
@@ -121,12 +121,13 @@ html, body, [class*="css"] {
     border-bottom: 1px solid #334155;
 }
 .stTabs [data-baseweb="tab"] {
-    height: 50px;
+    height: 40px; /* Reduced tab height */
     border-radius: 8px 8px 0 0;
     background-color: transparent;
     border: 1px solid transparent;
     color: #94a3b8;
     font-weight: 500;
+    font-size: 0.9rem;
 }
 .stTabs [aria-selected="true"] {
     background-color: #1e293b;
@@ -141,19 +142,25 @@ html, body, [class*="css"] {
     color: #f1f5f9;
     border: 1px solid #475569;
     border-radius: 8px;
+    min-height: 40px;
 }
 .stButton > button {
     background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     border: none;
     border-radius: 8px;
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 0.8rem;
     font-weight: 600;
     transition: all 0.3s ease;
 }
 .stButton > button:hover {
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
     transform: translateY(-2px);
+}
+/* Reduce default block padding */
+.block-container {
+    padding-top: 2rem !important;
+    padding-bottom: 1rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -254,23 +261,20 @@ if "history" not in st.session_state:
 branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
 categories = get_all_categories()
 
-# ================= Header (Logo + Title) ==================
-# 로고와 제목 간격을 좁히기 위해 컬럼 비율 조정 ([1, 8] 정도로 로고 영역 작게)
-col_h1, col_h2 = st.columns([1, 8])
+# ================= Header (Compact) ==================
+col_h1, col_h2 = st.columns([0.5, 9.5])
 
 with col_h1:
     if os.path.exists("logo_circle.png"):
-        # 로고 크기도 약간 조정 가능하지만 우선 유지
-        st.image("logo_circle.png", width=100)       
+        st.image("logo_circle.png", width=50)       
     else:
-        st.markdown("<div style='font-size:4rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:2rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
 
 with col_h2:
-    # margin-top 조정으로 수직 정렬 맞춤
     st.markdown("""
-    <div style="margin-top: 5px;">
-        <h1 class="title-text" style="font-size: 2.5rem;">Everest Inventory</h1>
-        <p class="subtitle-text">Professional Stock Management System</p>
+    <div style="display: flex; align-items: baseline; gap: 15px;">
+        <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">Everest Inventory</h1>
+        <p class="subtitle-text" style="margin: 0;">Professional Stock Management System</p>
     </div>
     """, unsafe_allow_html=True)
 
