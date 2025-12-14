@@ -34,34 +34,46 @@ if not st.session_state["splash_shown"]:
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        height: 80vh;
+        height: 100vh; /* Full viewport height for centering */
         text-align: center;
-        color: #0f172a; /* Darker text color requested */
+        color: #ffffff; /* White text for contrast */
+        z-index: 10;
+        position: relative;
+    }
+    .splash-content-box {
+        background: rgba(0, 0, 0, 0.6); /* Dark semi-transparent box */
+        padding: 40px 60px;
+        border-radius: 20px;
+        backdrop-filter: blur(5px); /* Glassmorphism effect */
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        border: 1px solid rgba(255, 255, 255, 0.18);
         animation: fadeIn 1.5s ease-in-out;
+        max-width: 90%;
     }
     .splash-title {
         font-size: 3.5rem;
         font-weight: 800;
-        text-shadow: 0 4px 10px rgba(255,255,255,0.5); /* Light shadow for dark text */
+        text-shadow: 0 2px 10px rgba(0,0,0,0.5);
         margin-bottom: 1rem;
+        color: #f8fafc;
     }
     .splash-subtitle {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #1e293b; /* Dark slate */
-        margin-bottom: 3rem;
-        text-shadow: 0 2px 5px rgba(255,255,255,0.5);
+        font-size: 1.3rem;
+        font-weight: 500;
+        color: #cbd5e1; /* Light grey for subtitle */
+        margin-bottom: 2rem;
     }
     .tap-hint {
-        margin-top: 50px;
+        margin-top: 30px;
         font-size: 1rem;
-        color: #334155;
+        color: #94a3b8;
         animation: blink 2s infinite;
-        font-weight: 500;
+        font-weight: 400;
+        letter-spacing: 1px;
     }
     @keyframes fadeIn {
-        0% { opacity: 0; transform: translateY(20px); }
-        100% { opacity: 1; transform: translateY(0); }
+        0% { opacity: 0; transform: translateY(20px); scale: 0.95; }
+        100% { opacity: 1; transform: translateY(0); scale: 1; }
     }
     @keyframes blink {
         0%, 100% { opacity: 1; }
@@ -105,9 +117,11 @@ if not st.session_state["splash_shown"]:
 
     st.markdown("""
         <div class="splash-container">
-            <div class="splash-title">Everest Restaurant Inventory</div>
-            <div class="splash-subtitle">Professional Stock Management System</div>
-            <div class="tap-hint">Tap anywhere to start</div>
+            <div class="splash-content-box">
+                <div class="splash-title">Everest Restaurant Inventory</div>
+                <div class="splash-subtitle">Professional Stock Management System</div>
+                <div class="tap-hint">Tap anywhere to start</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
     
