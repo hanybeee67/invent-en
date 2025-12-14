@@ -52,22 +52,36 @@ if not st.session_state["splash_shown"]:
         margin-bottom: 3rem;
         text-shadow: 0 2px 5px rgba(255,255,255,0.5);
     }
-    .enter-btn {
-        margin-top: 20px;
+    .tap-hint {
+        margin-top: 50px;
+        font-size: 1rem;
+        color: #334155;
+        animation: blink 2s infinite;
+        font-weight: 500;
     }
     @keyframes fadeIn {
         0% { opacity: 0; transform: translateY(20px); }
         100% { opacity: 1; transform: translateY(0); }
     }
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    /* Invisible Full-Screen Button */
+    div.stButton > button:first-child {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 99999;
+        opacity: 0;
+        cursor: pointer;
+    }
     </style>
     """, unsafe_allow_html=True)
     
-    # Background Image Handling (Streamlit is tricky with local files, so we use base64 or st.image overlay)
-    # Using a clean overlay approach for the splash content
-    
-    # Try to load local image for background if possible, effectively using st.image as background is hard without base64.
-    # We'll use a centered column layout for the content.
-    
+    # Background Image Handling
     import base64
     def get_base64_of_bin_file(bin_file):
         with open(bin_file, 'rb') as f:
@@ -93,14 +107,14 @@ if not st.session_state["splash_shown"]:
         <div class="splash-container">
             <div class="splash-title">Everest Restaurant Inventory</div>
             <div class="splash-subtitle">Professional Stock Management System</div>
+            <div class="tap-hint">Tap anywhere to start</div>
         </div>
     """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        if st.button("Enter System", type="primary", use_container_width=True):
-            st.session_state["splash_shown"] = True
-            st.rerun()
+    # Full screen button (invisible due to CSS above)
+    if st.button("Enter System", key="splash_btn"):
+        st.session_state["splash_shown"] = True
+        st.rerun()
             
     st.stop() # Stop execution here so the rest of the app doesn't load
 
