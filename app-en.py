@@ -8,8 +8,103 @@ import io
 st.set_page_config(
     page_title="Everest Inventory Management System",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # Hide sidebar on splash
 )
+
+# ================= Splash Screen Logic ==================
+if "splash_shown" not in st.session_state:
+    st.session_state["splash_shown"] = False
+
+if not st.session_state["splash_shown"]:
+    # Splash Screen CSS
+    st.markdown("""
+    <style>
+    .stApp {
+        background-image: url("app/static/everest_background_blur.png"); /* Fallback if local hosting varies */
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    /* Hide default elements during splash */
+    [data-testid="stSidebar"], .stDeployButton, footer, header {
+        display: none !important;
+    }
+    .splash-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 80vh;
+        text-align: center;
+        color: white;
+        animation: fadeIn 1.5s ease-in-out;
+    }
+    .splash-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        margin-bottom: 1rem;
+    }
+    .splash-subtitle {
+        font-size: 1.2rem;
+        font-weight: 400;
+        color: #e2e8f0;
+        margin-bottom: 3rem;
+        text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+    .enter-btn {
+        margin-top: 20px;
+    }
+    @keyframes fadeIn {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Background Image Handling (Streamlit is tricky with local files, so we use base64 or st.image overlay)
+    # Using a clean overlay approach for the splash content
+    
+    # Try to load local image for background if possible, effectively using st.image as background is hard without base64.
+    # We'll use a centered column layout for the content.
+    
+    import base64
+    def get_base64_of_bin_file(bin_file):
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+
+    bg_img_path = "everest_background_blur.png"
+    if os.path.exists(bg_img_path):
+        bin_str = get_base64_of_bin_file(bg_img_path)
+        page_bg_img = f'''
+        <style>
+        .stApp {{
+            background-image: url("data:image/png;base64,{bin_str}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+        </style>
+        '''
+        st.markdown(page_bg_img, unsafe_allow_html=True)
+
+    st.markdown("""
+        <div class="splash-container">
+            <div class="splash-title">Everest Inventory</div>
+            <div class="splash-subtitle">Professional Stock Management System</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        if st.button("Enter System", type="primary", use_container_width=True):
+            st.session_state["splash_shown"] = True
+            st.rerun()
+            
+    st.stop() # Stop execution here so the rest of the app doesn't load
+
+# ================= Normal App Logic Starts Here ==================
 
 # ================= Ingredient Database (기본 하드코딩 백업) ==================
 ingredient_list = []
@@ -157,10 +252,28 @@ html, body, [class*="css"] {
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
     transform: translateY(-2px);
 }
-/* Reduce default block padding */
+/* 2. Compact Header Area (Fixed Clipping) */
+.header-container {
+    display: flex;
+    align-items: center;
+    padding: 15px 0; /* Increased padding slightly */
+    margin-bottom: 20px;
+    border-bottom: 2px solid #334155;
+}
+/* Reduce default block padding to fix top cut-off */
 .block-container {
-    padding-top: 2rem !important;
+    padding-top: 3rem !important; /* Increased from 2rem to 3rem for safety */
     padding-bottom: 1rem !important;
+}
+
+.logo-img {
+    width: 50px; /* Slightly larger for visibility */
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    object-fit: cover; /* Ensure image fits well */
 }
 </style>
 """, unsafe_allow_html=True)
