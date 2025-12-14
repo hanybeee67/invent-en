@@ -30,32 +30,39 @@ if not st.session_state["splash_shown"]:
         display: none !important;
     }
     .splash-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        height: 100vh; /* Full viewport height for centering */
         text-align: center;
-        color: #ffffff; /* White text for contrast */
-        z-index: 10;
-        position: relative;
+        color: #ffffff;
+        z-index: 9999; /* Ensure it sits on top of everything */
+        background: transparent; /* Background image is on stApp */
     }
     .splash-content-box {
-        background: rgba(0, 0, 0, 0.6); /* Dark semi-transparent box */
-        padding: 40px 60px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 40px 30px; /* Reduced side padding for mobile */
         border-radius: 20px;
-        backdrop-filter: blur(5px); /* Glassmorphism effect */
+        backdrop-filter: blur(5px);
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         border: 1px solid rgba(255, 255, 255, 0.18);
         animation: fadeIn 1.5s ease-in-out;
         max-width: 90%;
+        width: auto;
     }
     .splash-title {
-        font-size: 3.5rem;
+        font-size: clamp(2rem, 6vw, 4rem); /* Responsive font size */
+        line-height: 1.2;
         font-weight: 800;
         text-shadow: 0 2px 10px rgba(0,0,0,0.5);
         margin-bottom: 1rem;
         color: #f8fafc;
+        word-break: keep-all; /* Prevent word breaking in Korean/English mixed */
     }
     .splash-subtitle {
         font-size: 1.3rem;
