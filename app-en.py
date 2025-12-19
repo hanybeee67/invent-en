@@ -142,7 +142,31 @@ if not st.session_state["splash_shown"]:
 # ================= Normal App Logic Starts Here ==================
 
 # ================= Ingredient Database (기본 하드코딩 백업) ==================
-ingredient_list = []
+# ================= Ingredient Database (기본 하드코딩 백업) ==================
+ingredient_list = [
+    {"category": "Meat", "item": "Chicken", "unit": "kg"},
+    {"category": "Meat", "item": "Mutton", "unit": "kg"},
+    {"category": "Meat", "item": "Pork", "unit": "kg"},
+    {"category": "Meat", "item": "Buffalo", "unit": "kg"},
+    {"category": "Meat", "item": "Fish", "unit": "kg"},
+    {"category": "Vegetable", "item": "Onion", "unit": "kg"},
+    {"category": "Vegetable", "item": "Tomato", "unit": "kg"},
+    {"category": "Vegetable", "item": "Potato", "unit": "kg"},
+    {"category": "Vegetable", "item": "Garlic", "unit": "kg"},
+    {"category": "Vegetable", "item": "Ginger", "unit": "kg"},
+    {"category": "Vegetable", "item": "Cabbage", "unit": "kg"},
+    {"category": "Spices", "item": "Salt", "unit": "kg"},
+    {"category": "Spices", "item": "Sugar", "unit": "kg"},
+    {"category": "Spices", "item": "Cumin Powder", "unit": "kg"},
+    {"category": "Spices", "item": "Turmeric Powder", "unit": "kg"},
+    {"category": "Spices", "item": "Chili Powder", "unit": "kg"},
+    {"category": "Dairy", "item": "Milk", "unit": "L"},
+    {"category": "Dairy", "item": "Yogurt", "unit": "L"},
+    {"category": "Dairy", "item": "Paneer", "unit": "kg"},
+    {"category": "Others", "item": "Rice", "unit": "kg"},
+    {"category": "Others", "item": "Flour", "unit": "kg"},
+    {"category": "Others", "item": "Cooking Oil", "unit": "L"},
+]
 
 # ================= Files ==================
 DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
@@ -322,20 +346,24 @@ def load_item_db():
     
     # 1. 파일 로드
     if os.path.exists(ITEM_FILE):
-        with open(ITEM_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                parts = [p.strip() for p in line.split("\t") if p.strip()]
-                if len(parts) >= 3:
-                    cat, item, unit = parts[0], parts[1], parts[2]
-                    items.append({"category": cat, "item": item, "unit": unit})
+        try:
+            with open(ITEM_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    if not line.strip(): continue
+                    parts = [p.strip() for p in line.split("\t")]
+                    if len(parts) >= 2:
+                        cat = parts[0]
+                        item = parts[1]
+                        unit = parts[2] if len(parts) >= 3 else ""
+                        items.append({"category": cat, "item": item, "unit": unit})
+        except Exception as e:
+            st.error(f"Error reading {ITEM_FILE}: {e}")
     
     # 2. 기본 리스트(ingredient_list) 병합 (중복 방지)
-    # 파일에 있는 것이 우선(Unit 정보가 있을 수 있으므로)
-    existing_keys = set((i["category"], i["item"]) for i in items)
+    existing_keys = set((i["category"].lower(), i["item"].lower()) for i in items)
     
     for default in ingredient_list:
-        if (default["category"], default["item"]) not in existing_keys:
-            # 기본 리스트의 unit 사용
+        if (default["category"].lower(), default["item"].lower()) not in existing_keys:
             items.append({
                 "category": default["category"], 
                 "item": default["item"], 
@@ -875,3 +903,13 @@ if tab6:
 
                 except Exception as e:
                     st.error(f"Error processing file: {e}")
+
+            st.markdown("---")
+            st.markdown("### 2. Emergency Recovery")
+            st.warning("If file upload fails due to network issues, you can initialize the database with basic default ingredients.")
+            if st.button("🚀 Initialize with Default Ingredients", key="init_defaults"):
+                with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                    for d in ingredient_list:
+                        f.write(f"{d['category']}\t{d['item']}\t{d['unit']}\n")
+                st.success("Default database created! Reloading...")
+                st.rerun()
