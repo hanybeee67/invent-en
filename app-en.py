@@ -862,44 +862,69 @@ if tab6:
                 key="dl_template"
             )
 
-            # 2. 파일 업로드 및 처리
-            uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
-            
-            if uploaded_file is not None:
+            # 입력 방식 선택
+            input_mode = st.radio("Choose Input Method", ["Excel File Upload", "Copy & Paste from Excel"], key="input_mode", horizontal=True)
+
+            new_df = None
+
+            if input_mode == "Excel File Upload":
+                # 2. 파일 업로드 및 처리
+                uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
+                if uploaded_file is not None:
+                    try:
+                        new_df = pd.read_excel(uploaded_file)
+                    except Exception as e:
+                        st.error(f"Error reading Excel file: {e}")
+            else:
+                # 복사/붙여넣기 방식
+                st.write("1. Open your Excel file.")
+                st.write("2. Select and Copy (Ctrl+C) the data (including headers: Category, Item, Unit).")
+                st.write("3. Paste (Ctrl+V) into the box below.")
+                pasted_text = st.text_area("Paste Excel Data Here", height=200, key="pasted_text", help="Copy from Excel and paste here. Tab-separated values are supported.")
+                if pasted_text:
+                    try:
+                        # 엑셀에서 복사하면 기본적으로 탭으로 구분됨
+                        new_df = pd.read_csv(io.StringIO(pasted_text), sep="\t")
+                        if len(new_df.columns) < 2: # 탭이 아니면 콤마 시도
+                            new_df = pd.read_csv(io.StringIO(pasted_text), sep=",")
+                    except Exception as e:
+                        st.error(f"Error parsing pasted text: {e}")
+
+            if new_df is not None:
                 try:
-                    new_df = pd.read_excel(uploaded_file)
-                    st.write("Preview of uploaded data:")
-                    st.dataframe(new_df.head(), use_container_width=True)
+                    st.write("Preview of data to be applied:")
                     
-                    # 유효성 검사 (Relaxed Validation)
-                    # 1. 컬럼명 정규화 (공백제거, Title Case 변환)
-                    # 예: " category " -> "Category", "item" -> "Item"
-                    new_df.columns = [c.strip().title() for c in new_df.columns]
+                    # 컬럼명 정규화 (대소문자 무시, 공백 제거)
+                    col_map = {c.lower().strip(): c for c in new_df.columns}
+                    
+                    # 필요한 컬럼 찾기
+                    cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
+                    item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
+                    unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
 
-                    required_cols = ["Category", "Item", "Unit"]
-                    missing_cols = [col for col in required_cols if col not in new_df.columns]
-
-                    if missing_cols:
-                        st.error(f"Excel file must contain columns: {required_cols}. Missing: {missing_cols}")
+                    if not cat_col or not item_col:
+                        st.error("Could not find 'Category' or 'Item' columns. Please check your headers.")
+                        st.dataframe(new_df.head())
                     else:
+                        # 표준 컬럼으로 재구성
+                        process_df = pd.DataFrame()
+                        process_df["Category"] = new_df[cat_col].astype(str).str.strip()
+                        process_df["Item"] = new_df[item_col].astype(str).str.strip()
+                        process_df["Unit"] = new_df[unit_col].astype(str).str.strip() if unit_col else ""
+                        
+                        # 유효 데이터만 필터
+                        process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
+                                                process_df["Item"].notna() & (process_df["Item"] != "")]
+
+                        st.dataframe(process_df.head(), use_container_width=True)
+                        st.write(f"Total {len(process_df)} items found.")
+
                         if st.button("✅ Apply to Database", key="apply_db"):
-                            # 파일로 저장 (food ingrediants.txt)
-                            # 기존 형식: Category<TAB>Item<TAB>Unit
                             with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                                for _, row in new_df.iterrows():
-                                    # 탭이나 줄바꿈 문자 제거
-                                    cat = str(row["Category"]).strip()
-                                    item = str(row["Item"]).strip()
-                                    unit = str(row["Unit"]).strip()
-                                    if cat and item:
-                                        f.write(f"{cat}\t{item}\t{unit}\n")
-                            
-                            # 메모리 갱신
-                            # item_db, categories 변수 등은 리로드 필요
-                            # 가장 쉬운 방법은 캐시 날리거나, rerun.
-                            # 여기서는 app 재실행 유도 또는 직접 갱신
+                                for _, row in process_df.iterrows():
+                                    f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
                             st.success("Successfully updated! Reloading...")
-                            st.rerun() 
+                            st.rerun()
 
                 except Exception as e:
                     st.error(f"Error processing file: {e}")
