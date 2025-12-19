@@ -147,9 +147,6 @@ ingredient_list = []
 # ================= Files ==================
 DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
 HISTORY_FILE = "stock_history.csv"        # 입출고 로그
-# ================= Files ==================
-DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
-HISTORY_FILE = "stock_history.csv"        # 입출고 로그
 ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
 
 # ================= Login Logic ==================
@@ -347,25 +344,24 @@ def load_item_db():
             
     return items
 
-item_db = load_item_db()
-
 def get_all_categories():
-    # item_db가 이제 항상 채워져 있으므로 바로 사용
-    return sorted(set([i["category"] for i in item_db]))
+    db = load_item_db()
+    return sorted(set([i["category"] for i in db]))
 
 def get_all_units():
-    # item_db에서 사용된 모든 Unit 추출 (빈 값 제외)
-    return sorted(set([i["unit"] for i in item_db if i["unit"]]))
+    db = load_item_db()
+    return sorted(set([i["unit"] for i in db if i["unit"]]))
 
 def get_items_by_category(category):
-    return sorted([i["item"] for i in item_db if i["category"] == category])
+    db = load_item_db()
+    return sorted([i["item"] for i in db if i["category"] == category])
 
 def get_unit_for_item(category, item):
-    if item_db:
-        for i in item_db:
-            if i["category"] == category and i["item"] == item:
-                return i["unit"]
-    return ""  # 없으면 빈 문자열
+    db = load_item_db()
+    for i in db:
+        if i["category"] == category and i["item"] == item:
+            return i["unit"]
+    return ""
 
 # ================= Data Load / Save ==================
 def load_inventory():
@@ -407,7 +403,6 @@ if "history" not in st.session_state:
 # ...
 
 branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
-categories = get_all_categories()
 
 # ================= Header (Compact) ==================
 col_h1, col_h2 = st.columns([0.5, 9.5])
@@ -469,7 +464,7 @@ if tab1:
         
         with col1:
             branch = st.selectbox("Branch", branches, key="branch")
-            category = st.selectbox("Category", categories, key="category")
+            category = st.selectbox("Category", get_all_categories(), key="category")
         
         with col2:
             input_type = st.radio("Item Input", ["Select from list", "Type manually"], key="input_type")
@@ -629,7 +624,7 @@ with tab3:
         log_branch = st.selectbox("Branch", branches, key="log_branch")
     
     with c2:
-        log_category = st.selectbox("Category", categories, key="log_category")
+        log_category = st.selectbox("Category", get_all_categories(), key="log_category")
         log_items = get_items_by_category(log_category)
         log_item = st.selectbox("Item", log_items, key="log_item")
     
@@ -691,7 +686,7 @@ with tab4:
             with a1:
                 sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
             with a2:
-                sel_cat = st.selectbox("Category", ["All"] + categories, key="ana_cat")
+                sel_cat = st.selectbox("Category", ["All"] + get_all_categories(), key="ana_cat")
             with a3:
                 # 기간 선택 (월 단위)
                 year_options = sorted(set(history_df["DateObj"].dt.year))
@@ -875,11 +870,8 @@ if tab6:
                             # item_db, categories 변수 등은 리로드 필요
                             # 가장 쉬운 방법은 캐시 날리거나, rerun.
                             # 여기서는 app 재실행 유도 또는 직접 갱신
-                            st.success("Successfully updated! Please refresh the page to reflect changes.")
-                            
-                            # session_state 갱신 시도 (optional)
-                            # item_db = load_item_db() # 전역이라 즉시 반영 안될 수 있음, rerun 권장
-                            st.stop() # Rerun to reload
+                            st.success("Successfully updated! Reloading...")
+                            st.rerun() 
 
                 except Exception as e:
                     st.error(f"Error processing file: {e}")
