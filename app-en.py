@@ -439,68 +439,112 @@ html, body, [class*="css"] {
 # ================= Voice Recognition Component ==================
 def voice_recognition_component():
     """
-    네팔어 음성 인식을 수행하고 결과를 표시하는 컴포넌트
+    네팔어 음성 인식을 수행하고 결과를 표시하는 컴포넌트 (강화된 버전)
     """
     components_code = f"""
-    <div style="background: rgba(30, 41, 59, 0.5); padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center;">
-        <button id="mic-btn" style="background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 50%; width: 70px; height: 70px; cursor: pointer; font-size: 28px; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4); transition: transform 0.2s;">
+    <div id="mic-container" style="background: rgba(30, 41, 59, 0.5); padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center; font-family: 'Outfit', sans-serif;">
+        <button id="mic-btn" style="background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 50%; width: 75px; height: 75px; cursor: pointer; font-size: 30px; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4); transition: all 0.3s ease;">
             🎙
         </button>
-        <div id="status" style="margin-top: 12px; color: #94a3b8; font-family: 'Outfit', sans-serif; font-size: 14px;">{t('mic_off')}</div>
-        <div id="result" style="margin-top: 8px; font-weight: bold; color: #38bdf8; font-family: 'Outfit', sans-serif; min-height: 24px; font-size: 16px;"></div>
-        <div style="margin-top: 10px; color: #64748b; font-size: 11px; font-family: 'Outfit', sans-serif;">(Speak, then copy transcript to 'Item name')</div>
+        <div id="status" style="margin-top: 15px; color: #94a3b8; font-size: 15px;">{t('mic_off')}</div>
+        <div id="interim" style="margin-top: 5px; color: #64748b; font-style: italic; font-size: 13px; height: 18px;"></div>
+        <div id="result" style="margin-top: 10px; font-weight: bold; color: #38bdf8; min-height: 28px; font-size: 18px; padding: 5px; border-bottom: 1px solid #1e293b;"></div>
+        <div id="debug" style="margin-top: 10px; color: #ef4444; font-size: 11px; font-family: monospace;"></div>
+        <div style="margin-top: 12px; color: #475569; font-size: 12px;">(눌러서 말하기 → 텍스트 자동 복사 → 입력창에 붙여넣기)</div>
     </div>
 
     <script>
         const micBtn = document.getElementById('mic-btn');
         const status = document.getElementById('status');
+        const interimDiv = document.getElementById('interim');
         const resultDiv = document.getElementById('result');
+        const debugDiv = document.getElementById('debug');
 
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {{
-            status.innerText = "Browser not supported.";
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {{
+            status.innerText = "Error: Browser does not support speech recognition.";
             micBtn.disabled = true;
+            micBtn.style.opacity = "0.5";
         }} else {{
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             const recognition = new SpeechRecognition();
             recognition.lang = 'ne-NP';
-            recognition.interimResults = false;
+            recognition.interimResults = true; // 실시간 결과 표시
+            recognition.maxAlternatives = 1;
+
+            let isRecognizing = false;
 
             micBtn.onclick = () => {{
-                try {{
-                    recognition.start();
-                    status.innerText = "{t('mic_on')}";
-                    micBtn.style.transform = "scale(1.1)";
-                    micBtn.style.boxShadow = "0 0 20px #38bdf8";
-                }} catch(e) {{
-                    console.log(e);
+                if (isRecognizing) {{
+                    recognition.stop();
+                }} else {{
+                    try {{
+                        debugDiv.innerText = "";
+                        recognition.start();
+                        isRecognizing = true;
+                        status.innerText = "{t('mic_on')}";
+                        micBtn.style.background = "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)";
+                        micBtn.style.transform = "scale(1.1)";
+                        micBtn.style.boxShadow = "0 0 20px #ef4444";
+                    }} catch(e) {{
+                        debugDiv.innerText = "Startup Error: " + e.message;
+                    }}
                 }}
             }};
 
             recognition.onresult = (event) => {{
-                const transcript = event.results[0][0].transcript;
-                resultDiv.innerText = transcript;
-                status.innerText = "{t('mic_off')}";
-                micBtn.style.transform = "scale(1)";
-                micBtn.style.boxShadow = "0 4px 15px rgba(37, 99, 235, 0.4)";
-                
-                // Copy to clipboard
-                const el = document.createElement('textarea');
-                el.value = transcript;
-                document.body.appendChild(el);
-                el.select();
-                document.execCommand('copy');
-                document.body.removeChild(el);
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {{
+                    if (event.results[i].isFinal) {{
+                        finalTranscript += event.results[i][0].transcript;
+                    }} else {{
+                        interimTranscript += event.results[i][0].transcript;
+                    }}
+                }}
+
+                if (finalTranscript) {{
+                    resultDiv.innerText = finalTranscript;
+                    // 자동 복사
+                    const el = document.createElement('textarea');
+                    el.value = finalTranscript;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    status.innerText = "✅ Copied to clipboard!";
+                    setTimeout(() => {{ if(!isRecognizing) status.innerText = "{t('mic_off')}"; }}, 2000);
+                }}
+                interimDiv.innerText = interimTranscript;
             }};
 
             recognition.onerror = (event) => {{
-                status.innerText = event.error;
+                isRecognizing = false;
+                debugDiv.innerText = "Error encountered: " + event.error;
+                status.innerText = "{t('mic_off')}";
+                micBtn.style.background = "linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)";
                 micBtn.style.transform = "scale(1)";
+                micBtn.style.boxShadow = "0 4px 15px rgba(37, 99, 235, 0.4)";
+                
+                if(event.error === 'not-allowed') {{
+                    debugDiv.innerText = "Microphone access denied. Please check site permissions.";
+                }}
+            }};
+
+            recognition.onend = () => {{
+                isRecognizing = false;
+                status.innerText = "{t('mic_off')}";
+                micBtn.style.background = "linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)";
+                micBtn.style.transform = "scale(1)";
+                micBtn.style.boxShadow = "0 4px 15px rgba(37, 99, 235, 0.4)";
+                interimDiv.innerText = "";
             }};
         }}
     </script>
     """
     import streamlit.components.v1 as components
-    components.html(components_code, height=180)
+    components.html(components_code, height=220)
 
 # ================= Load item DB from file ==================
 def load_item_db():
