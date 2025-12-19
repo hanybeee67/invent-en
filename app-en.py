@@ -15,144 +15,6 @@ st.set_page_config(
 if "splash_shown" not in st.session_state:
     st.session_state["splash_shown"] = False
 
-if "lang" not in st.session_state:
-    st.session_state["lang"] = "English"
-
-# ================= Translation Dictionary ==================
-translations = {
-    "English": {
-        "title": "Everest Inventory",
-        "subtitle": "Professional Stock Management System",
-        "enter": "Enter System",
-        "tap_hint": "Tap anywhere to start",
-        "tab1": "✏ Register / Edit",
-        "tab2": "📊 View / Print",
-        "tab3": "📦 IN / OUT Log",
-        "tab4": "📈 Analysis",
-        "tab5": "📄 Report",
-        "tab6": "💾 Data Mgmt",
-        "branch": "Branch",
-        "category": "Category",
-        "item_name": "Item name",
-        "unit": "Unit",
-        "qty": "Current Quantity",
-        "min_qty": "Minimum Required",
-        "note": "Note",
-        "save_new": "💾 Register New",
-        "save_update": "💾 Update Inventory",
-        "delete": "🗑 Delete Item",
-        "success_reg": "Registered Successfully!",
-        "success_upd": "Updated Successfully!",
-        "warn_del": "Item Deleted.",
-        "manager_login": "🔒 Manager Login Required",
-        "password": "Password",
-        "login": "Login",
-        "err_pw": "Incorrect Password",
-        "date": "Date",
-        "type": "Type",
-        "record_btn": "📥 Record IN / OUT",
-        "low_stock_warn": "items are below minimum stock level!",
-        "emergency_btn": "🚀 Initialize with Default Ingredients",
-        "view_print": "View / Print Inventory",
-        "filter_date": "Filter by Date",
-        "print_btn": "🖨 Download Printable HTML",
-        "log_title": "Stock IN / OUT Log (Auto Update Inventory)",
-        "in_out_success": "IN / OUT recorded and inventory updated!",
-        "recent_movements": "Recent Stock Movements",
-        "usage_title": "Usage Analysis (by Branch / Category / Item)",
-        "year": "Year",
-        "month": "Month",
-        "no_data": "No data found for the selected criteria.",
-        "top_items": "Top Used Items (by OUT Quantity)",
-        "cat_usage": "Category Usage (OUT Quantity)",
-        "report_title": "📄 Monthly Stock Report (Excel + PDF)",
-        "gen_report": "Generate Monthly Report",
-        "excel_dl": "⬇ Download Excel Report",
-        "pdf_dl": "⬇ Download PDF Summary",
-        "data_mgmt_title": "💾 Data Management / Settings",
-        "bulk_import": "### 1. Bulk Import Ingredients",
-        "bulk_info": "Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.",
-        "dl_template": "⬇ Download Excel Template",
-        "choose_input": "Choose Input Method",
-        "excel_upload": "Excel File Upload",
-        "copy_paste": "Copy & Paste from Excel",
-        "paste_box": "Paste Excel Data Here",
-        "apply_db": "✅ Apply to Database",
-        "emergency_title": "### 2. Emergency Recovery",
-        "emergency_info": "If file upload fails due to network issues, you can initialize the database with basic default ingredients.",
-        "qty_label": "Quantity",
-        "mic_on": "🎤 Listening (नेपाली)...",
-        "mic_off": "🎙 Start Voice Recognition (नेपाली)",
-    },
-    "Nepali": {
-        "title": "एभरेष्ट इन्भेन्टरी",
-        "subtitle": "प्रोफेशनल स्टक म्यानेजमेन्ट सिस्टम",
-        "enter": "सिस्टममा प्रवेश गर्नुहोस्",
-        "tap_hint": "सुरु गर्न जहाँसुकै ट्याप गर्नुहोस्",
-        "tab1": "✏ दर्ता / सम्पादन",
-        "tab2": "📊 हेर्नुहोस् / प्रिन्ट",
-        "tab3": "📦 भित्र / बाहिर लग",
-        "tab4": "📈 विश्लेषण",
-        "tab5": "📄 रिपोर्ट",
-        "tab6": "💾 डाटा व्यवस्थापन",
-        "branch": "शाखा",
-        "category": "कोटि",
-        "item_name": "सामानको नाम",
-        "unit": "एकाइ",
-        "qty": "हालको मात्रा",
-        "min_qty": "न्यूनतम आवश्यकता",
-        "note": "नोट",
-        "save_new": "💾 नयाँ दर्ता गर्नुहोस्",
-        "save_update": "💾 इन्भेन्टरी अपडेट गर्नुहोस्",
-        "delete": "🗑 सामान हटाउनुहोस्",
-        "success_reg": "सफलतापूर्वक दर्ता भयो!",
-        "success_upd": "सफलतापूर्वक अपडेट भयो!",
-        "warn_del": "सामान हटाइयो।",
-        "manager_login": "🔒 प्रबन्धक लगइन आवश्यक छ",
-        "password": "पासवर्ड",
-        "login": "लगइन",
-        "err_pw": "गलत पासवर्ड",
-        "date": "मिति",
-        "type": "प्रकार",
-        "record_btn": "📥 भित्र / बाहिर रेकورد गर्नुहोस",
-        "low_stock_warn": "सामानहरू न्यूनतम स्टक स्तरभन्दा कम छन्!",
-        "emergency_btn": "🚀 पूर्वनिर्धारित सामग्रीहरूसँग सुरु गर्नुहोस्",
-        "view_print": "इन्भेन्टरी हेर्नुहोस् / प्रिन्ट गर्नुहोस्",
-        "filter_date": "मिति द्वारा फिल्टर गर्नुहोस्",
-        "print_btn": "🖨 प्रिन्ट योग्य HTML डाउनलोड गर्नुहोस्",
-        "log_title": "स्टक भित्र / बाहिर लग (अटो अपडेट)",
-        "in_out_success": "भित्र / बाहिर रेकर्ड गरियो र इन्भेन्टरी अपडेट गरियो!",
-        "recent_movements": "हालको स्टक आन्दोलनहरू",
-        "usage_title": "प्रयोग विश्लेषण (शाखा / कोटि / सामान)",
-        "year": "वर्ष",
-        "month": "महिना",
-        "no_data": "छनोट गरिएको मापदण्डको लागि कुनै डाटा फेला परेन।",
-        "top_items": "सवाधिक प्रयोग गरिएका सामानहरू (बाहिर मात्रा वास्तबमा)",
-        "cat_usage": "कोटि प्रयोग (बाहिर मात्रा)",
-        "report_title": "📄 मासिक स्टक रिपोर्ट (Excel + PDF)",
-        "gen_report": "मासिक रिपोर्ट उत्पन्न गर्नुहोस्",
-        "excel_dl": "⬇ एक्सेल रिपोर्ट डाउनलोड गर्नुहोस्",
-        "pdf_dl": "⬇ PDF सारांश डाउनलोड गर्नुहोस्",
-        "data_mgmt_title": "💾 डाटा व्यवस्थापन / सेटिङहरू",
-        "bulk_import": "### १. थोक आयात सामग्रीहरू",
-        "bulk_info": "तपाइँका सबै सामग्रीहरू एकै पटक दर्ता गर्न एक्सेल फाइल अपलोड गर्नुहोस्। अवस्थित डाटा अधिलेखन/मर्ज गरिनेछ।",
-        "dl_template": "⬇ एक्सेल टेम्पलेट डाउनलोड गर्नुहोस्",
-        "choose_input": "इनपुट विधि छनोट गर्नुहोस्",
-        "excel_upload": "एक्सेल फाइल अपलोड",
-        "copy_paste": "एक्सेलबाट प्रतिलिपि र टाँस्नुहोस्",
-        "paste_box": "यहाँ एक्सेल डाटा टाँस्नुहोस्",
-        "apply_db": "✅ डाटाबेसमा लागू गर्नुहोस्",
-        "emergency_title": "### २. आपतकालीन रिकभरी",
-        "emergency_info": "यदि नेटवर्क समस्याहरूको कारण फाइल अपलोड असफल भयो भने, तपाइँ आधारभूत पूर्वनिर्धारित सामग्रीहरूको साथ डाटाबेस सुरु गर्न सक्नुहुन्छ।",
-        "qty_label": "मात्रा",
-        "mic_on": "🎤 सुन्दै छु (नेपाली)...",
-        "mic_off": "🎙 आवाज पहिचान सुरु गर्नुहोस् (नेपाली)",
-    }
-}
-
-def t(key):
-    return translations[st.session_state["lang"]].get(key, key)
-
 if not st.session_state["splash_shown"]:
     # Splash Screen CSS
     st.markdown("""
@@ -260,18 +122,18 @@ if not st.session_state["splash_shown"]:
         '''
         st.markdown(page_bg_img, unsafe_allow_html=True)
 
-    st.markdown(f"""
+    st.markdown("""
         <div class="splash-container">
             <div class="splash-content-box">
-                <div class="splash-title">{t('title')}</div>
-                <div class="splash-subtitle">{t('subtitle')}</div>
-                <div class="tap-hint">{t('tap_hint')}</div>
+                <div class="splash-title">Everest Restaurant Inventory</div>
+                <div class="splash-subtitle">Professional Stock Management System</div>
+                <div class="tap-hint">Tap anywhere to start</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
     
     # Full screen button (invisible due to CSS above)
-    if st.button(t('enter'), key="splash_btn"):
+    if st.button("Enter System", key="splash_btn"):
         st.session_state["splash_shown"] = True
         st.rerun()
             
@@ -323,15 +185,15 @@ def check_login(key_suffix):
     if st.session_state["logged_in"]:
         return True
 
-    st.warning(t("manager_login"))
-    password = st.text_input(t("password"), type="password", key=f"login_pw_{key_suffix}")
+    st.warning("🔒 Manager Login Required")
+    password = st.text_input("Password", type="password", key=f"login_pw_{key_suffix}")
     
-    if st.button(t("login"), key=f"login_btn_{key_suffix}"):
+    if st.button("Login", key=f"login_btn_{key_suffix}"):
         if password == "1234":
             st.session_state["logged_in"] = True
             st.rerun()
         else:
-            st.error(t("err_pw"))
+            st.error("Incorrect Password")
     
     return False
 
@@ -349,30 +211,24 @@ html, body, [class*="css"] {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
-/* 2. Compact Header Area (Fixed Clipping) */
+/* 2. Compact Header Area */
 .header-container {
     display: flex;
     align-items: center;
-    padding: 15px 0;
-    margin-bottom: 20px;
+    padding: 10px 0; /* Reduced padding */
+    margin-bottom: 10px; /* Reduced margin */
     border-bottom: 2px solid #334155;
 }
-.block-container {
-    padding-top: 3rem !important;
-    padding-bottom: 1rem !important;
-}
-
 .logo-img {
-    width: 50px;
-    height: 50px;
+    width: 40px; /* Smaller logo */
+    height: 40px;
     border-radius: 50%;
     margin-right: 15px;
     border: 2px solid #38bdf8;
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
-    object-fit: cover;
 }
 .title-text {
-    font-size: 1.8rem;
+    font-size: 1.5rem; /* Smaller title */
     font-weight: 700;
     background: -webkit-linear-gradient(45deg, #f8fafc, #94a3b8);
     -webkit-background-clip: text;
@@ -380,19 +236,34 @@ html, body, [class*="css"] {
     margin: 0;
 }
 .subtitle-text {
-    font-size: 0.9rem;
+    font-size: 0.8rem; /* Smaller subtitle */
     color: #94a3b8;
     margin-top: 2px;
 }
 
 /* 3. Card & Metrics */
+.metric-container {
+    display: flex;
+    gap: 20px;
+}
 .metric-box {
     background: rgba(30, 41, 59, 0.7);
     backdrop-filter: blur(10px);
     border: 1px solid #334155;
     border-radius: 12px;
     padding: 15px 25px;
+    flex: 1;
     text-align: center;
+}
+.metric-label {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin-bottom: 5px;
+}
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #38bdf8;
 }
 
 /* 4. Tabs Customization */
@@ -401,11 +272,13 @@ html, body, [class*="css"] {
     border-bottom: 1px solid #334155;
 }
 .stTabs [data-baseweb="tab"] {
-    height: 45px;
+    height: 40px; /* Reduced tab height */
     border-radius: 8px 8px 0 0;
     background-color: transparent;
+    border: 1px solid transparent;
     color: #94a3b8;
     font-weight: 500;
+    font-size: 0.9rem;
 }
 .stTabs [aria-selected="true"] {
     background-color: #1e293b;
@@ -420,12 +293,14 @@ html, body, [class*="css"] {
     color: #f1f5f9;
     border: 1px solid #475569;
     border-radius: 8px;
+    min-height: 40px;
 }
 .stButton > button {
     background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     border: none;
     border-radius: 8px;
+    padding: 0.4rem 0.8rem;
     font-weight: 600;
     transition: all 0.3s ease;
 }
@@ -433,118 +308,31 @@ html, body, [class*="css"] {
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
     transform: translateY(-2px);
 }
+/* 2. Compact Header Area (Fixed Clipping) */
+.header-container {
+    display: flex;
+    align-items: center;
+    padding: 15px 0; /* Increased padding slightly */
+    margin-bottom: 20px;
+    border-bottom: 2px solid #334155;
+}
+/* Reduce default block padding to fix top cut-off */
+.block-container {
+    padding-top: 3rem !important; /* Increased from 2rem to 3rem for safety */
+    padding-bottom: 1rem !important;
+}
+
+.logo-img {
+    width: 50px; /* Slightly larger for visibility */
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+    border: 2px solid #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    object-fit: cover; /* Ensure image fits well */
+}
 </style>
 """, unsafe_allow_html=True)
-
-# ================= Voice Recognition Component ==================
-def voice_recognition_component():
-    """
-    네팔어 음성 인식을 수행하고 결과를 표시하는 컴포넌트 (강화된 버전)
-    """
-    components_code = f"""
-    <div id="mic-container" style="background: rgba(30, 41, 59, 0.5); padding: 20px; border-radius: 12px; border: 1px solid #334155; text-align: center; font-family: 'Outfit', sans-serif;">
-        <button id="mic-btn" style="background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 50%; width: 75px; height: 75px; cursor: pointer; font-size: 30px; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4); transition: all 0.3s ease;">
-            🎙
-        </button>
-        <div id="status" style="margin-top: 15px; color: #94a3b8; font-size: 15px;">{t('mic_off')}</div>
-        <div id="interim" style="margin-top: 5px; color: #64748b; font-style: italic; font-size: 13px; height: 18px;"></div>
-        <div id="result" style="margin-top: 10px; font-weight: bold; color: #38bdf8; min-height: 28px; font-size: 18px; padding: 5px; border-bottom: 1px solid #1e293b;"></div>
-        <div id="debug" style="margin-top: 10px; color: #ef4444; font-size: 11px; font-family: monospace;"></div>
-        <div style="margin-top: 12px; color: #475569; font-size: 12px;">(눌러서 말하기 → 텍스트 자동 복사 → 입력창에 붙여넣기)</div>
-    </div>
-
-    <script>
-        const micBtn = document.getElementById('mic-btn');
-        const status = document.getElementById('status');
-        const interimDiv = document.getElementById('interim');
-        const resultDiv = document.getElementById('result');
-        const debugDiv = document.getElementById('debug');
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-        if (!SpeechRecognition) {{
-            status.innerText = "Error: Browser does not support speech recognition.";
-            micBtn.disabled = true;
-            micBtn.style.opacity = "0.5";
-        }} else {{
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'ne-NP';
-            recognition.interimResults = true; // 실시간 결과 표시
-            recognition.maxAlternatives = 1;
-
-            let isRecognizing = false;
-
-            micBtn.onclick = () => {{
-                if (isRecognizing) {{
-                    recognition.stop();
-                }} else {{
-                    try {{
-                        debugDiv.innerText = "";
-                        recognition.start();
-                        isRecognizing = true;
-                        status.innerText = "{t('mic_on')}";
-                        micBtn.style.background = "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)";
-                        micBtn.style.transform = "scale(1.1)";
-                        micBtn.style.boxShadow = "0 0 20px #ef4444";
-                    }} catch(e) {{
-                        debugDiv.innerText = "Startup Error: " + e.message;
-                    }}
-                }}
-            }};
-
-            recognition.onresult = (event) => {{
-                let interimTranscript = '';
-                let finalTranscript = '';
-
-                for (let i = event.resultIndex; i < event.results.length; ++i) {{
-                    if (event.results[i].isFinal) {{
-                        finalTranscript += event.results[i][0].transcript;
-                    }} else {{
-                        interimTranscript += event.results[i][0].transcript;
-                    }}
-                }}
-
-                if (finalTranscript) {{
-                    resultDiv.innerText = finalTranscript;
-                    // 자동 복사
-                    const el = document.createElement('textarea');
-                    el.value = finalTranscript;
-                    document.body.appendChild(el);
-                    el.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(el);
-                    status.innerText = "✅ Copied to clipboard!";
-                    setTimeout(() => {{ if(!isRecognizing) status.innerText = "{t('mic_off')}"; }}, 2000);
-                }}
-                interimDiv.innerText = interimTranscript;
-            }};
-
-            recognition.onerror = (event) => {{
-                isRecognizing = false;
-                debugDiv.innerText = "Error encountered: " + event.error;
-                status.innerText = "{t('mic_off')}";
-                micBtn.style.background = "linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)";
-                micBtn.style.transform = "scale(1)";
-                micBtn.style.boxShadow = "0 4px 15px rgba(37, 99, 235, 0.4)";
-                
-                if(event.error === 'not-allowed') {{
-                    debugDiv.innerText = "Microphone access denied. Please check site permissions.";
-                }}
-            }};
-
-            recognition.onend = () => {{
-                isRecognizing = false;
-                status.innerText = "{t('mic_off')}";
-                micBtn.style.background = "linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)";
-                micBtn.style.transform = "scale(1)";
-                micBtn.style.boxShadow = "0 4px 15px rgba(37, 99, 235, 0.4)";
-                interimDiv.innerText = "";
-            }};
-        }}
-    </script>
-    """
-    import streamlit.components.v1 as components
-    components.html(components_code, height=220)
 
 # ================= Load item DB from file ==================
 def load_item_db():
@@ -654,21 +442,12 @@ with col_h1:
         st.markdown("<div style='font-size:2rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
 
 with col_h2:
-    st.markdown(f"""
-    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 15px; width: 100%;">
-        <div style="display: flex; align-items: baseline; gap: 15px;">
-            <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">{t('title')}</h1>
-            <p class="subtitle-text" style="margin: 0;">{t('subtitle')}</p>
-        </div>
+    st.markdown("""
+    <div style="display: flex; align-items: baseline; gap: 15px;">
+        <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">Everest Inventory</h1>
+        <p class="subtitle-text" style="margin: 0;">Professional Stock Management System</p>
     </div>
     """, unsafe_allow_html=True)
-
-# Language Toggle in a clean way
-st.sidebar.markdown("### 🌐 Language / भाषा")
-lang_choice = st.sidebar.radio("Select Language", ["English", "Nepali"], index=0 if st.session_state["lang"]=="English" else 1, key="lang_radio")
-if lang_choice != st.session_state["lang"]:
-    st.session_state["lang"] = lang_choice
-    st.rerun()
 
 st.markdown("---")
 
@@ -683,18 +462,20 @@ if not st.session_state.inventory.empty:
     low_stock = inv_df[(inv_df["CurrentQty"] <= inv_df["MinQty"]) & (inv_df["MinQty"] > 0)]
     
     if not low_stock.empty:
-        st.error(f"⚠️ Warning: {len(low_stock)} {t('low_stock_warn')}", icon="🚨")
+        st.error(f"⚠️ Warning: {len(low_stock)} items are below minimum stock level!", icon="🚨")
         with st.expander("View Low Stock Items"):
             st.dataframe(low_stock[["Branch", "Category", "Item", "CurrentQty", "MinQty", "Unit"]], use_container_width=True)
 
 # ================= Tabs ==================
+
+# ================= Tabs ==================
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    t("tab1"),
-    t("tab2"),
-    t("tab3"),
-    t("tab4"),
-    t("tab5"),
-    t("tab6")
+    "✏ Register / Edit Inventory",
+    "📊 View / Print Inventory",
+    "📦 IN / OUT Log",
+    "📈 Usage Analysis",
+    "📄 Monthly Report",
+    "💾 Data Management"
 ])
 
 # ======================================================
@@ -702,30 +483,24 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ======================================================
 if tab1:
     with tab1:
-        st.subheader(t("tab1"))
+        st.subheader("Register / Edit Inventory")
         
-        # --- Voice Input Area (New) ---
-        if st.session_state["lang"] == "Nepali":
-            with st.expander(t("mic_off"), expanded=False):
-                voice_recognition_component()
-                st.info("💡 माइक थिच्नुहोस् र बोल्नुहोस्। तपाईंको आवाज पाठमा परिवर्तन हुनेछ। त्यसपछि त्यसलाई प्रतिलिपि गरेर तलको 'सामानको नाम' मा टाँस्न सक्नुहुन्छ। (Tip: Native keyboard dictation also works great!)")
-
         col0, col1, col2, col3 = st.columns(4)
         
         with col0:
-            selected_date = st.date_input(f"📅 {t('date')}", value=date.today(), key="selected_date")
+            selected_date = st.date_input("📅 Date", value=date.today(), key="selected_date")
         
         with col1:
-            branch = st.selectbox(t("branch"), branches, key="branch")
-            category = st.selectbox(t("category"), get_all_categories(), key="category")
+            branch = st.selectbox("Branch", branches, key="branch")
+            category = st.selectbox("Category", get_all_categories(), key="category")
         
         with col2:
             input_type = st.radio("Item Input", ["Select from list", "Type manually"], key="input_type")
             if input_type == "Select from list":
                 items = get_items_by_category(category)
-                item = st.selectbox(t("item_name"), items, key="item_name")
+                item = st.selectbox("Item name", items, key="item_name")
             else:
-                item = st.text_input(t("item_name"), key="item_name_manual")
+                item = st.text_input("Item name", key="item_name_manual")
 
             # ---- Unit 자동 세팅 + 선택 가능 ----
             auto_unit = get_unit_for_item(category, item) if input_type == "Select from list" else ""
@@ -751,7 +526,7 @@ if tab1:
             except ValueError:
                 default_index = 0
                 
-            unit = st.selectbox(t("unit"), unit_options, index=default_index, key="unit_select")
+            unit = st.selectbox("Unit", unit_options, index=default_index, key="unit_select")
 
         # ---- 기존 데이터 확인 로직 (위젯 렌더링 전에 실행해야 함) ----
         df_curr = st.session_state.inventory
@@ -788,15 +563,15 @@ if tab1:
 
         with col3:
             # key="qty" 등을 사용할 때 session_state에 값이 있으면 그 값을 초기값으로 사용
-            qty = st.number_input(t("qty"), min_value=0.0, step=1.0, key="qty")
-            min_qty = st.number_input(t("min_qty"), min_value=0.0, step=1.0, key="min_qty")
-            note = st.text_input(t("note"), key="note")
+            qty = st.number_input("Current Quantity", min_value=0.0, step=1.0, key="qty")
+            min_qty = st.number_input("Minimum Required", min_value=0.0, step=1.0, key="min_qty")
+            note = st.text_input("Note", key="note")
 
         # 버튼 영역
         b_col1, b_col2 = st.columns(2)
         
         with b_col1:
-            btn_label = t("save_update") if is_update else t("save_new")
+            btn_label = "💾 Update Inventory" if is_update else "💾 Register New"
             if st.button(btn_label, key="save_btn"):
                 df = st.session_state.inventory.copy()
                 if is_update:
@@ -805,25 +580,25 @@ if tab1:
                     df.loc[mask, "Note"] = note
                     df.loc[mask, "Date"] = str(selected_date)
                     df.loc[mask, "Unit"] = unit 
-                    st.success(t("success_upd"))
+                    st.success("Updated Successfully!")
                 else:
                     new_row = pd.DataFrame(
                         [[branch, item, category, unit, qty, min_qty, note, str(selected_date)]],
                         columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
                     )
                     df = pd.concat([df, new_row], ignore_index=True)
-                    st.success(t("success_reg"))
+                    st.success("Registered Successfully!")
                 st.session_state.inventory = df
                 save_inventory(df)
         
         with b_col2:
             if is_update:
-                if st.button(t("delete"), key="del_btn", type="primary"):
+                if st.button("🗑 Delete Item", key="del_btn", type="primary"):
                     df = st.session_state.inventory.copy()
                     df = df[~mask]
                     st.session_state.inventory = df
                     save_inventory(df)
-                    st.warning(t("warn_del"))
+                    st.warning("Item Deleted.")
                     st.session_state.last_loaded_key = ""
                     st.rerun()
 
@@ -831,25 +606,25 @@ if tab1:
 # TAB 2: View / Print Inventory (All)
 # ======================================================
 with tab2:
-    st.subheader(t("view_print"))
+    st.subheader("View / Print Inventory")
     
     df = st.session_state.inventory.copy()
     
     # 날짜 필터
-    date_filter = st.date_input(t("filter_date"), key="view_date")
+    date_filter = st.date_input("Filter by Date", key="view_date")
     if date_filter:
         df = df[df["Date"] == str(date_filter)]
     
     # 지점 필터 (추가됨)
-    branch_filter = st.selectbox(t("branch"), ["All"] + branches, key="view_branch")
+    branch_filter = st.selectbox("Branch", ["All"] + branches, key="view_branch")
     if branch_filter != "All":
         df = df[df["Branch"] == branch_filter]
     
-    category_filter = st.selectbox(t("category"), ["All"] + sorted(set(df["Category"])), key="view_cat")
+    category_filter = st.selectbox("Category", ["All"] + sorted(set(df["Category"])), key="view_cat")
     if category_filter != "All":
         df = df[df["Category"] == category_filter]
     
-    item_filter = st.selectbox(t("item_name"), ["All"] + sorted(set(df["Item"])), key="view_item")
+    item_filter = st.selectbox("Item", ["All"] + sorted(set(df["Item"])), key="view_item")
     if item_filter != "All":
         df = df[df["Item"] == item_filter]
     
@@ -857,7 +632,7 @@ with tab2:
     
     printable_html = df.to_html(index=False)
     st.download_button(
-        t("print_btn"),
+        "🖨 Download Printable HTML",
         data=f"<html><body>{printable_html}</body></html>",
         file_name="inventory_print.html",
         mime="text/html",
@@ -868,26 +643,26 @@ with tab2:
 # TAB 3: IN/OUT Log (All)
 # ======================================================
 with tab3:
-    st.subheader(t("log_title"))
+    st.subheader("Stock IN / OUT Log (Auto Update Inventory)")
     
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        log_date = st.date_input(t("date"), value=date.today(), key="log_date")
-        log_branch = st.selectbox(t("branch"), branches, key="log_branch")
+        log_date = st.date_input("Date", value=date.today(), key="log_date")
+        log_branch = st.selectbox("Branch", branches, key="log_branch")
     
     with c2:
-        log_category = st.selectbox(t("category"), get_all_categories(), key="log_category")
+        log_category = st.selectbox("Category", get_all_categories(), key="log_category")
         log_items = get_items_by_category(log_category)
-        log_item = st.selectbox(t("item_name"), log_items, key="log_item")
+        log_item = st.selectbox("Item", log_items, key="log_item")
     
     with c3:
         log_unit = get_unit_for_item(log_category, log_item)
-        st.write(f"{t('unit')}: **{log_unit or '-'}**")
-        log_type = st.selectbox(t("type"), ["IN", "OUT"], key="log_type")
-        log_qty = st.number_input(t("qty_label"), min_value=0.0, step=1.0, key="log_qty")
+        st.write(f"Unit: **{log_unit or '-'}**")
+        log_type = st.selectbox("Type", ["IN", "OUT"], key="log_type")
+        log_qty = st.number_input("Quantity", min_value=0.0, step=1.0, key="log_qty")
 
-    if st.button(t("record_btn"), key="log_btn"):
+    if st.button("📥 Record IN / OUT", key="log_btn"):
         # 1) 히스토리 저장
         history_df = st.session_state.history.copy()
         history_df.loc[len(history_df)] = [
@@ -926,25 +701,25 @@ with tab3:
 # TAB 4: Usage Analysis (All)
 # ======================================================
 with tab4:
-    st.subheader(t("usage_title"))
+    st.subheader("Usage Analysis (by Branch / Category / Item)")
     
     if check_login("tab4"):
         history_df = st.session_state.history.copy()
         if history_df.empty:
-            st.info(t("no_data"))
+            st.info("No history data yet.")
         else:
             history_df["DateObj"] = pd.to_datetime(history_df["Date"])
 
             a1, a2, a3 = st.columns(3)
             with a1:
-                sel_branch = st.selectbox(t("branch"), ["All"] + branches, key="ana_branch")
+                sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
             with a2:
-                sel_cat = st.selectbox(t("category"), ["All"] + get_all_categories(), key="ana_cat")
+                sel_cat = st.selectbox("Category", ["All"] + get_all_categories(), key="ana_cat")
             with a3:
                 # 기간 선택 (월 단위)
                 year_options = sorted(set(history_df["DateObj"].dt.year))
-                sel_year = st.selectbox(t("year"), year_options, index=len(year_options)-1, key="ana_year")
-                sel_month = st.selectbox(t("month"), list(range(1,13)), index=datetime.now().month-1, key="ana_month")
+                sel_year = st.selectbox("Year", year_options, index=len(year_options)-1, key="ana_year")
+                sel_month = st.selectbox("Month", list(range(1,13)), index=datetime.now().month-1, key="ana_month")
 
             # 필터 적용
             filt = (history_df["DateObj"].dt.year == sel_year) & (history_df["DateObj"].dt.month == sel_month)
@@ -956,17 +731,17 @@ with tab4:
             use_df = history_df[filt]
 
             if use_df.empty:
-                st.info(t("no_data"))
+                st.info("선택한 조건에 해당하는 데이터가 없습니다.")
             else:
                 # OUT 기준 사용량 계산
                 out_df = use_df[use_df["Type"] == "OUT"]
 
-                st.markdown(f"#### {t('top_items')}")
+                st.markdown("#### Top Used Items (by OUT Quantity)")
                 item_usage = out_df.groupby(["Branch","Category","Item"])["Qty"].sum().reset_index()
                 item_usage = item_usage.sort_values("Qty", ascending=False)
                 st.dataframe(item_usage.head(20), use_container_width=True)
 
-                st.markdown(f"#### {t('cat_usage')}")
+                st.markdown("#### Category Usage (OUT Quantity)")
                 cat_usage = out_df.groupby(["Branch","Category"])["Qty"].sum().reset_index()
                 cat_usage = cat_usage.sort_values("Qty", ascending=False)
                 st.dataframe(cat_usage, use_container_width=True)
@@ -976,13 +751,13 @@ with tab4:
 # ======================================================
 if tab5:
     with tab5:
-        st.subheader(t("report_title"))
+        st.subheader("📄 Monthly Stock Report (Excel + PDF)")
         
         if check_login("tab5"):
-            rep_year = st.number_input(t("year"), min_value=2020, max_value=2100, value=datetime.now().year, step=1, key="rep_year")
-            rep_month = st.number_input(t("month"), min_value=1, max_value=12, value=datetime.now().month, step=1, key="rep_month")
+            rep_year = st.number_input("Year", min_value=2020, max_value=2100, value=datetime.now().year, step=1, key="rep_year")
+            rep_month = st.number_input("Month", min_value=1, max_value=12, value=datetime.now().month, step=1, key="rep_month")
 
-            if st.button(t("gen_report"), key="rep_btn"):
+            if st.button("Generate Monthly Report", key="rep_btn"):
                 inv = st.session_state.inventory.copy()
                 hist = st.session_state.history.copy()
 
@@ -1009,7 +784,7 @@ if tab5:
                 excel_buffer.seek(0)
 
                 st.download_button(
-                    t("excel_dl"),
+                    "⬇ Download Excel Report",
                     data=excel_buffer,
                     file_name=f"Everest_Report_{rep_year}_{rep_month}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1046,7 +821,7 @@ if tab5:
                     pdf_buffer.seek(0)
 
                     st.download_button(
-                        t("pdf_dl"),
+                        "⬇ Download PDF Summary",
                         data=pdf_buffer,
                         file_name=f"Everest_Report_{rep_year}_{rep_month}.pdf",
                         mime="application/pdf",
@@ -1060,11 +835,11 @@ if tab5:
 # ======================================================
 if tab6:
     with tab6:
-        st.subheader(t("data_mgmt_title"))
+        st.subheader("💾 Data Management / Settings")
         
         if check_login("tab6"):
-            st.markdown(t("bulk_import"))
-            st.info(t("bulk_info"))
+            st.markdown("### 1. Bulk Import Ingredients")
+            st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
 
             # 1. 템플릿 다운로드
             sample_data = [
@@ -1080,7 +855,7 @@ if tab6:
             template_buffer.seek(0)
             
             st.download_button(
-                label=t("dl_template"),
+                label="⬇ Download Excel Template",
                 data=template_buffer,
                 file_name="ingredient_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1088,11 +863,11 @@ if tab6:
             )
 
             # 입력 방식 선택
-            input_mode = st.radio(t("choose_input"), [t("excel_upload"), t("copy_paste")], key="input_mode", horizontal=True)
+            input_mode = st.radio("Choose Input Method", ["Excel File Upload", "Copy & Paste from Excel"], key="input_mode", horizontal=True)
 
             new_df = None
 
-            if input_mode == t("excel_upload"):
+            if input_mode == "Excel File Upload":
                 # 2. 파일 업로드 및 처리
                 uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
                 if uploaded_file is not None:
