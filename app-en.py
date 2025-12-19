@@ -620,11 +620,14 @@ with tab2:
     if branch_filter != "All":
         df = df[df["Branch"] == branch_filter]
     
-    category_filter = st.selectbox("Category", ["All"] + sorted(set(df["Category"])), key="view_cat")
+    # NaN 방지 및 문자열 변환 후 정렬
+    categories_list = sorted(set(df["Category"].fillna("").astype(str)))
+    category_filter = st.selectbox("Category", ["All"] + [c for c in categories_list if c], key="view_cat")
     if category_filter != "All":
         df = df[df["Category"] == category_filter]
     
-    item_filter = st.selectbox("Item", ["All"] + sorted(set(df["Item"])), key="view_item")
+    items_list = sorted(set(df["Item"].fillna("").astype(str)))
+    item_filter = st.selectbox("Item", ["All"] + [i for i in items_list if i], key="view_item")
     if item_filter != "All":
         df = df[df["Item"] == item_filter]
     
