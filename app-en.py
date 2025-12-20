@@ -359,16 +359,8 @@ def load_item_db():
         except Exception as e:
             st.error(f"Error reading {ITEM_FILE}: {e}")
     
-    # 2. 기본 리스트(ingredient_list) 병합 (중복 방지)
-    existing_keys = set((i["category"].lower(), i["item"].lower()) for i in items)
-    
-    for default in ingredient_list:
-        if (default["category"].lower(), default["item"].lower()) not in existing_keys:
-            items.append({
-                "category": default["category"], 
-                "item": default["item"], 
-                "unit": default.get("unit", "") 
-            })
+    # 2. 기본 리스트(ingredient_list) 병합 제거 (사용자 요청: 파일 데이터만 사용)
+    # 기존 코드: ingredient_list와 병합하던 로직을 삭제함
             
     return items
 
