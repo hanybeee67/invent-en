@@ -871,75 +871,87 @@ if tab6:
             # 입력 방식 선택
             input_mode = st.radio("Choose Input Method", ["Excel File Upload", "Copy & Paste from Excel"], key="input_mode", horizontal=True)
 
-            new_df = None
+            # 세션 스테이트 초기화
+            if 'bulk_df' not in st.session_state:
+                st.session_state.bulk_df = None
 
             if input_mode == "Excel File Upload":
-                # 2. 파일 업로드 및 처리
                 uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
                 if uploaded_file is not None:
                     try:
-                        new_df = pd.read_excel(uploaded_file)
+                        temp_df = pd.read_excel(uploaded_file)
+                        # 표준 컬럼 정규화
+                        col_map = {c.lower().strip(): c for c in temp_df.columns}
+                        cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
+                        item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
+                        unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
+
+                        if cat_col and item_col:
+                            process_df = pd.DataFrame()
+                            process_df["Category"] = temp_df[cat_col].astype(str).str.strip()
+                            process_df["Item"] = temp_df[item_col].astype(str).str.strip()
+                            process_df["Unit"] = temp_df[unit_col].astype(str).str.strip() if unit_col else ""
+                            process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
+                                                    process_df["Item"].notna() & (process_df["Item"] != "")]
+                            st.session_state.bulk_df = process_df
+                        else:
+                            st.error("Could not find required columns (Category, Item).")
                     except Exception as e:
-                        st.error(f"Error reading Excel file: {e}")
+                        st.error(f"Error reading Excel: {e}")
             else:
-                # 복사/붙여넣기 방식
-                st.write("1. Open your Excel file.")
-                st.write("2. Select and Copy (Ctrl+C) the data (including headers: Category, Item, Unit).")
-                st.write("3. Paste (Ctrl+V) into the box below.")
-                pasted_text = st.text_area("Paste Excel Data Here", height=200, key="pasted_text", help="Copy from Excel and paste here. Tab-separated values are supported.")
+                pasted_text = st.text_area("Paste Excel Data Here", height=200, key="pasted_text")
                 if pasted_text:
                     try:
-                        # 엑셀에서 복사하면 기본적으로 탭으로 구분됨
-                        new_df = pd.read_csv(io.StringIO(pasted_text), sep="\t")
-                        if len(new_df.columns) < 2: # 탭이 아니면 콤마 시도
-                            new_df = pd.read_csv(io.StringIO(pasted_text), sep=",")
-                    except Exception as e:
-                        st.error(f"Error parsing pasted text: {e}")
-
-            if new_df is not None:
-                try:
-                    st.write("Preview of data to be applied:")
-                    
-                    # 컬럼명 정규화 (대소문자 무시, 공백 제거)
-                    col_map = {c.lower().strip(): c for c in new_df.columns}
-                    
-                    # 필요한 컬럼 찾기
-                    cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
-                    item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
-                    unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
-
-                    if not cat_col or not item_col:
-                        st.error("Could not find 'Category' or 'Item' columns. Please check your headers.")
-                        st.dataframe(new_df.head())
-                    else:
-                        # 표준 컬럼으로 재구성
-                        process_df = pd.DataFrame()
-                        process_df["Category"] = new_df[cat_col].astype(str).str.strip()
-                        process_df["Item"] = new_df[item_col].astype(str).str.strip()
-                        process_df["Unit"] = new_df[unit_col].astype(str).str.strip() if unit_col else ""
+                        temp_df = pd.read_csv(io.StringIO(pasted_text), sep="\t")
+                        if len(temp_df.columns) < 2: 
+                            temp_df = pd.read_csv(io.StringIO(pasted_text), sep=",")
                         
-                        # 유효 데이터만 필터
-                        process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
-                                                process_df["Item"].notna() & (process_df["Item"] != "")]
+                        col_map = {c.lower().strip(): c for c in temp_df.columns}
+                        cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
+                        item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
+                        unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
 
-                        st.dataframe(process_df.head(), use_container_width=True)
-                        st.write(f"Total {len(process_df)} items found.")
+                        if cat_col and item_col:
+                            process_df = pd.DataFrame()
+                            process_df["Category"] = temp_df[cat_col].astype(str).str.strip()
+                            process_df["Item"] = temp_df[item_col].astype(str).str.strip()
+                            process_df["Unit"] = temp_df[unit_col].astype(str).str.strip() if unit_col else ""
+                            process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
+                                                    process_df["Item"].notna() & (process_df["Item"] != "")]
+                            st.session_state.bulk_df = process_df
+                    except Exception as e:
+                        st.error(f"Error parsing text: {e}")
 
-                        if st.button("✅ Apply to Database", key="apply_db"):
-                            with st.spinner("Saving data to database..."):
-                                try:
-                                    with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                                        for _, row in process_df.iterrows():
-                                            f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
-                                    st.success("Successfully updated!")
-                                    st.balloons()
-                                    st.info("Reloading application to apply changes...")
+            if st.session_state.bulk_df is not None:
+                st.write("### Preview of data to be applied:")
+                st.dataframe(st.session_state.bulk_df, use_container_width=True)
+                st.write(f"Total {len(st.session_state.bulk_df)} items ready to be registered.")
+                
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("✅ Apply to Database", key="apply_db", use_container_width=True):
+                        with st.spinner("Saving data to database..."):
+                            try:
+                                with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                                    for _, row in st.session_state.bulk_df.iterrows():
+                                        f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
+                                
+                                st.success(f"Successfully saved {len(st.session_state.bulk_df)} items!")
+                                st.balloons()
+                                # 갱신 유도
+                                st.info("Database updated. The list will be refreshed.")
+                                st.session_state.bulk_df = None # 처리 후 초기화
+                                # st.rerun() 을 바로 호출하면 success 메시지를 못 보므로 지연 처리나 수동 갱신 유도 가 나을 수 있음
+                                # 여기서는 일단 rerun 하여 반영 확인
+                                if st.button("Click here to refresh lists"):
                                     st.rerun()
-                                except Exception as e:
-                                    st.error(f"Failed to save data: {str(e)}")
 
-                except Exception as e:
-                    st.error(f"Error processing file: {e}")
+                            except Exception as e:
+                                st.error(f"Failed to save data: {str(e)}")
+                with col_btn2:
+                    if st.button("❌ Clear/Cancel", key="clear_bulk", use_container_width=True):
+                        st.session_state.bulk_df = None
+                        st.rerun()
 
             st.markdown("---")
             st.markdown("### 2. Emergency Recovery")
