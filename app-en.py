@@ -144,6 +144,39 @@ st.set_page_config(
     initial_sidebar_state="collapsed" # Hide sidebar on splash
 )
 
+# ================= Check for Voice Input (Must be before Splash) ==================
+if "voice_input" in st.query_params:
+    voice_text = st.query_params["voice_input"]
+    if voice_text:
+        item, qty = parse_voice_input(voice_text)
+        if item:
+            # 음성 인식 모드 활성화 및 스플래시 건너뛰기
+            st.session_state["voice_active"] = True
+            st.session_state["splash_shown"] = True
+            
+            # Tab 1용 상태 업데이트
+            st.session_state["item_name"] = item
+            st.session_state["qty"] = float(qty)
+            
+            # Tab 3용 상태 업데이트
+            st.session_state["log_item"] = item
+            st.session_state["log_qty"] = float(qty)
+            
+            # 아이템이 선택되었으므로 카테고리/단위도 자동 설정
+            db = load_item_db()
+            for row in db:
+                if row["item"] == item:
+                    st.session_state["category"] = row["category"]
+                    st.session_state["log_category"] = row["category"]
+                    st.session_state["unit_select"] = row["unit"]
+                    break
+            st.success(f"🎤 Voice Identified: {item} ({qty}) - Please check the input fields below.")
+        else:
+            st.warning(f"Could not find matching item for: {voice_text}")
+    
+    # 처리 완료 후 파라미터 제거
+    st.query_params.clear()
+
 # ================= Splash Screen Logic ==================
 if "splash_shown" not in st.session_state:
     st.session_state["splash_shown"] = False
@@ -526,37 +559,7 @@ def get_unit_for_item(category, item):
             return i["unit"]
     return ""
 
-# ================= Check for Voice Input in Query Params ==================
-if "voice_input" in st.query_params:
-    voice_text = st.query_params["voice_input"]
-    if voice_text:
-        item, qty = parse_voice_input(voice_text)
-        if item:
-            # 음성 인식 모드 활성화 (DB 덮어쓰기 방지)
-            st.session_state["voice_active"] = True
-            
-            # Tab 1용 상태 업데이트
-            st.session_state["item_name"] = item
-            st.session_state["qty"] = float(qty)
-            
-            # Tab 3용 상태 업데이트
-            st.session_state["log_item"] = item
-            st.session_state["log_qty"] = float(qty)
-            
-            # 아이템이 선택되었으므로 카테고리/단위도 자동 설정
-            db = load_item_db()
-            for row in db:
-                if row["item"] == item:
-                    st.session_state["category"] = row["category"]
-                    st.session_state["log_category"] = row["category"]
-                    st.session_state["unit_select"] = row["unit"]
-                    break
-            st.success(f"🎤 Voice Identified: {item} ({qty})")
-        else:
-            st.warning(f"Could not find matching item for: {voice_text}")
-    
-    # 처리 완료 후 파라미터 제거
-    st.query_params.clear()
+# ================= Check for Voice Input in Query Params (Moved to top) ==================
 
 # ================= Data Load / Save ==================
 def load_inventory():
