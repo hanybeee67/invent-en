@@ -1019,8 +1019,25 @@ if tab6:
         st.subheader("💾 Data Management / Settings")
         
         if check_login("tab6"):
-            st.markdown("### 1. Bulk Import Ingredients")
-            st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
+            st.warning("⚠️ **Important:** This system uses temporary cloud storage. All data will be reset whenever the application code is updated. Please **Download Backup** regularly to keep your data safe.")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("### 1. Bulk Import Ingredients")
+            with col2:
+                # 백업 다운로드 버튼 추가
+                if os.path.exists(ITEM_FILE):
+                    with open(ITEM_FILE, "r", encoding="utf-8") as f:
+                        btn_data = f.read()
+                    st.download_button(
+                        label="📤 Download Current Database (Backup)",
+                        data=btn_data,
+                        file_name="food_ingredients_backup.txt",
+                        mime="text/plain",
+                        key="backup_dl"
+                    )
+
+            st.info("Upload an Excel file to register all your ingredients at once.")
 
             # 1. 템플릿 다운로드
             sample_data = [
