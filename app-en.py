@@ -374,11 +374,13 @@ def load_item_db():
 
 def get_all_categories():
     db = load_item_db()
-    return sorted(set([i["category"] for i in db]))
+    # Ensure all values are strings and filter out empty strings
+    return sorted(set([str(i["category"]) for i in db if i.get("category")]))
 
 def get_all_units():
     db = load_item_db()
-    return sorted(set([i["unit"] for i in db if i["unit"]]))
+    # Ensure all values are strings and filter out empty strings
+    return sorted(set([str(i["unit"]) for i in db if i.get("unit")]))
 
 def get_items_by_category(category):
     db = load_item_db()
@@ -718,9 +720,10 @@ with tab4:
                 sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
             with a2:
                 sel_cat = st.selectbox("Category", ["All"] + get_all_categories(), key="ana_cat")
-            with a3:
-                # 기간 선택 (월 단위)
-                year_options = sorted(set(history_df["DateObj"].dt.year))
+                # 기간 선택 (월 단위) - NaN/NaT 제거
+                year_options = sorted(set(history_df["DateObj"].dt.year.dropna().astype(int)))
+                if not year_options:
+                    year_options = [datetime.now().year]
                 sel_year = st.selectbox("Year", year_options, index=len(year_options)-1, key="ana_year")
                 sel_month = st.selectbox("Month", list(range(1,13)), index=datetime.now().month-1, key="ana_month")
 
