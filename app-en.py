@@ -926,11 +926,17 @@ if tab6:
                         st.write(f"Total {len(process_df)} items found.")
 
                         if st.button("✅ Apply to Database", key="apply_db"):
-                            with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                                for _, row in process_df.iterrows():
-                                    f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
-                            st.success("Successfully updated! Reloading...")
-                            st.rerun()
+                            with st.spinner("Saving data to database..."):
+                                try:
+                                    with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                                        for _, row in process_df.iterrows():
+                                            f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
+                                    st.success("Successfully updated!")
+                                    st.balloons()
+                                    st.info("Reloading application to apply changes...")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Failed to save data: {str(e)}")
 
                 except Exception as e:
                     st.error(f"Error processing file: {e}")
@@ -939,8 +945,13 @@ if tab6:
             st.markdown("### 2. Emergency Recovery")
             st.warning("If file upload fails due to network issues, you can initialize the database with basic default ingredients.")
             if st.button("🚀 Initialize with Default Ingredients", key="init_defaults"):
-                with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                    for d in ingredient_list:
-                        f.write(f"{d['category']}\t{d['item']}\t{d['unit']}\n")
-                st.success("Default database created! Reloading...")
-                st.rerun()
+                with st.spinner("Initializing defaults..."):
+                    try:
+                        with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                            for d in ingredient_list:
+                                f.write(f"{d['category']}\t{d['item']}\t{d['unit']}\n")
+                        st.success("Default database created!")
+                        st.balloons()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to initialize: {str(e)}")
