@@ -3,139 +3,6 @@ import pandas as pd
 import os
 from datetime import date, datetime
 import io
-import re
-import streamlit.components.v1 as components
-
-# ================= Voice Recognition Mapping ==================
-# 제공된 이미지 기반 네팔어-영어 품목 매핑 사전
-NEPALI_TO_ENGLISH_ITEMS = {
-    # Flour/Rice
-    "दोस्रो ग्रेड मैदा": "2nd grade flour", "पहिलो ग्रेड मैदा": "1st grade flour", "कोरियन चामल": "Korean Rice",
-    # Vegetables
-    "प्याज": "Onion", "आलु": "Potato", "अदुवा": "Whole ginger", "लसुन": "Garlic", "बन्दाकोभी": "Cabbage",
-    "बाँसको तामा": "Bamboo shoot", "फर्सीको बीउ": "Pumpkin seed", "मूली": "Radish", "काँक्रो": "Cucumber",
-    "टमाटर": "Tomato", "गाँजर": "Carrot", "आइसवर्ग लेटस": "Iceberg", "पालक": "Spinach(frozen)",
-    "हरियो खुर्सानी": "Green Chili", "भेडे खुर्सانی": "Capsicum", "धनियाँ पात": "Coriander",
-    # Meat
-    "कुखुरा": "Chicken", "खसीको मासु": "Whole mutton", "झिङ्गे": "Prawn", "अण्डा": "Egg",
-    "कुखुराको छाती": "Chicken breast", "कुखुराको ड्रमस्टिक": "Chicken drumstick", "कुखुराको खुट्टा": "chicken leg",
-    # Spices/Sauces
-    "नुन": "Salt", "चिनी": "Sugar", "सिरका": "Vinegar", "सोया सस": "Soy sauce", "जिरा": "CUMIN SEED WHOLE",
-    "बेसार": "TURMERIC POWDER", "मरिच": "Black pepper powder", "ल्वाङ": "Clove powder", "सुकुमेल": "Cardamon",
-    # Others
-    "दूध": "Milk(sterilized)", "चिया": "LIPTON TEA", "घीउ": "GHEE", "तेल": "Cooking oil", "पानी": "Water",
-    "कोला": "Cola - 24each", "साइडर": "Cider-24each", "कागती": "Lemon", "काजु": "Cashnut", "बदाम": "Peanuts",
-    "च्याउ": "Saesongi mushroom", "चीज": "Cheese for cheese nan"
-}
-
-# 영어로 말할 경우를 대비한 매핑 (소문자 기준)
-ENGLISH_VARIANTS = {
-    "potato": "Potato", "onion": "Onion", "chicken": "Chicken", "mutton": "Mutton", "milk": "Milk(sterilized)",
-    "rice": "Korean Rice", "salt": "Salt", "sugar": "Sugar", "flour": "1st grade flour", "oil": "Cooking oil"
-}
-
-def parse_voice_input(text):
-    """
-    네팔어/영어 텍스트에서 품목과 수량을 추출함.
-    예: "आलु ५" -> ("Potato", 5.0)
-    """
-    if not text:
-        return None, None
-    
-    text = text.lower().strip()
-    
-    # 1. 수량(숫자) 추출
-    # 숫자가 포함되어 있는지 확인 (네팔어 숫자나 일반 숫자 모두 대응 시도)
-    match_num = re.search(r'(\d+\.?\d*)', text)
-    qty = float(match_num.group(1)) if match_num else 1.0
-    
-    # 2. 품목 추출
-    found_item = None
-    
-    # 네팔어 사전 검색
-    for ne_name, en_name in NEPALI_TO_ENGLISH_ITEMS.items():
-        if ne_name in text:
-            found_item = en_name
-            break
-            
-    # 영문 사전 검색 (네팔어 사전에 없을 경우)
-    if not found_item:
-        for variant, official in ENGLISH_VARIANTS.items():
-            if variant in text:
-                found_item = official
-                break
-                
-    return found_item, qty
-
-def voice_recognition_button():
-    """
-    네팔어/영어 음성 인식을 지원하는 HTML 버튼 컴포넌트.
-    """
-    html_code = """
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-        <button id="micBtn" style="
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white; border: none; border-radius: 50%; width: 50px; height: 50px;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
-            display: flex; align-items: center; justify-content: center; font-size: 24px;">
-            🎤
-        </button>
-        <span id="status" style="color: #94a3b8; font-size: 0.9rem;">Tap mic to speak (Nepali/English)</span>
-    </div>
-
-    <script>
-        const btn = document.getElementById('micBtn');
-        const status = document.getElementById('status');
-        
-        if (!('webkitSpeechRecognition' in window)) {
-            status.innerText = "Speech API not supported in this browser.";
-            btn.disabled = true;
-        } else {
-            const recognition = new webkitSpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = 'ne-NP'; // 네팔어 기본
-
-            btn.onclick = () => {
-                recognition.start();
-                btn.style.animation = "pulse 1.5s infinite";
-                status.innerText = "Listening...";
-            };
-
-            recognition.onresult = (event) => {
-                const text = event.results[0][0].transcript;
-                status.innerText = "Recognized: " + text;
-                btn.style.animation = "none";
-                
-                // 전송을 위해 URL 파라미터 업데이트
-                const url = new URL(window.parent.location.href);
-                url.searchParams.set('voice_input', text);
-                window.parent.location.href = url.href;
-            };
-
-            recognition.onerror = (event) => {
-                status.innerText = "Error: " + event.error;
-                btn.style.animation = "none";
-            };
-
-            recognition.onend = () => {
-                btn.style.animation = "none";
-            };
-        }
-    </script>
-    <style>
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-    </style>
-    """
-    components.html(html_code, height=90, scrolling=False)
-
-# ================= Check for Voice Input in Query Params (Moved below) ==================
-
-
 
 # ================= Page Config ==================
 st.set_page_config(
@@ -143,39 +10,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed" # Hide sidebar on splash
 )
-
-# ================= Check for Voice Input (Must be before Splash) ==================
-if "voice_input" in st.query_params:
-    voice_text = st.query_params["voice_input"]
-    if voice_text:
-        item, qty = parse_voice_input(voice_text)
-        if item:
-            # 음성 인식 모드 활성화 및 스플래시 건너뛰기
-            st.session_state["voice_active"] = True
-            st.session_state["splash_shown"] = True
-            
-            # Tab 1용 상태 업데이트
-            st.session_state["item_name"] = item
-            st.session_state["qty"] = float(qty)
-            
-            # Tab 3용 상태 업데이트
-            st.session_state["log_item"] = item
-            st.session_state["log_qty"] = float(qty)
-            
-            # 아이템이 선택되었으므로 카테고리/단위도 자동 설정
-            db = load_item_db()
-            for row in db:
-                if row["item"] == item:
-                    st.session_state["category"] = row["category"]
-                    st.session_state["log_category"] = row["category"]
-                    st.session_state["unit_select"] = row["unit"]
-                    break
-            st.success(f"🎤 Voice Identified: {item} ({qty}) - Please check the input fields below.")
-        else:
-            st.warning(f"Could not find matching item for: {voice_text}")
-    
-    # 처리 완료 후 파라미터 제거
-    st.query_params.clear()
 
 # ================= Splash Screen Logic ==================
 if "splash_shown" not in st.session_state:
@@ -559,8 +393,6 @@ def get_unit_for_item(category, item):
             return i["unit"]
     return ""
 
-# ================= Check for Voice Input in Query Params (Moved to top) ==================
-
 # ================= Data Load / Save ==================
 def load_inventory():
     if os.path.exists(DATA_FILE):
@@ -653,9 +485,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ======================================================
 if tab1:
     with tab1:
-        st.markdown("### 🎙️ Voice Input System")
-        voice_recognition_button()
-        st.markdown("---")
+        st.subheader("Register / Edit Inventory")
         
         col0, col1, col2, col3 = st.columns(4)
         
@@ -714,23 +544,21 @@ if tab1:
         
         # 아이템 변경 감지 -> 데이터 로드 또는 초기화
         if st.session_state.last_loaded_key != full_key:
-            # 음성 인식이 아닐 때만 DB 값을 불러와서 덮어씀
-            if not st.session_state.get("voice_active", False):
-                if not existing_row.empty:
-                    # DB 값 불러오기
-                    st.session_state["qty"] = float(existing_row.iloc[0]["CurrentQty"])
-                    st.session_state["min_qty"] = float(existing_row.iloc[0]["MinQty"])
-                    st.session_state["note"] = str(existing_row.iloc[0]["Note"])
-                else:
-                    # 신규 -> 초기화
-                    st.session_state["qty"] = 0.0
-                    st.session_state["min_qty"] = 0.0
-                    st.session_state["note"] = ""
+            if not existing_row.empty:
+                # DB 값 불러오기
+                st.session_state["qty"] = float(existing_row.iloc[0]["CurrentQty"])
+                st.session_state["min_qty"] = float(existing_row.iloc[0]["MinQty"])
+                st.session_state["note"] = str(existing_row.iloc[0]["Note"])
+            else:
+                # 신규 -> 초기화
+                st.session_state["qty"] = 0.0
+                st.session_state["min_qty"] = 0.0
+                st.session_state["note"] = ""
             
             st.session_state.last_loaded_key = full_key
-            # 음성 인식 모드 종료 (한 번 반영되었으므로)
-            if "voice_active" in st.session_state:
-                del st.session_state["voice_active"]
+            # 값을 설정했으므로, 아래 위젯들이 이 값을 물고 렌더링됨.
+            # 하지만 확실한 UI 갱신을 위해 rerun 할 수도 있으나, 
+            # widget key가 설정된 상태에서 값 update후 렌더링이면 반영됨.
 
         if not existing_row.empty:
             is_update = True
@@ -820,9 +648,6 @@ with tab2:
 # TAB 3: IN/OUT Log (All)
 # ======================================================
 with tab3:
-    st.markdown("### 🎙️ Voice Input System")
-    voice_recognition_button()
-    st.markdown("---")
     st.subheader("Stock IN / OUT Log (Auto Update Inventory)")
     
     c1, c2, c3 = st.columns(3)
@@ -1019,25 +844,8 @@ if tab6:
         st.subheader("💾 Data Management / Settings")
         
         if check_login("tab6"):
-            st.warning("⚠️ **Important:** This system uses temporary cloud storage. All data will be reset whenever the application code is updated. Please **Download Backup** regularly to keep your data safe.")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("### 1. Bulk Import Ingredients")
-            with col2:
-                # 백업 다운로드 버튼 추가
-                if os.path.exists(ITEM_FILE):
-                    with open(ITEM_FILE, "r", encoding="utf-8") as f:
-                        btn_data = f.read()
-                    st.download_button(
-                        label="📤 Download Current Database (Backup)",
-                        data=btn_data,
-                        file_name="food_ingredients_backup.txt",
-                        mime="text/plain",
-                        key="backup_dl"
-                    )
-
-            st.info("Upload an Excel file to register all your ingredients at once.")
+            st.markdown("### 1. Bulk Import Ingredients")
+            st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
 
             # 1. 템플릿 다운로드
             sample_data = [
