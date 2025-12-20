@@ -532,13 +532,16 @@ if "voice_input" in st.query_params:
     if voice_text:
         item, qty = parse_voice_input(voice_text)
         if item:
+            # 음성 인식 모드 활성화 (DB 덮어쓰기 방지)
+            st.session_state["voice_active"] = True
+            
             # Tab 1용 상태 업데이트
             st.session_state["item_name"] = item
-            st.session_state["qty"] = qty
+            st.session_state["qty"] = float(qty)
             
             # Tab 3용 상태 업데이트
             st.session_state["log_item"] = item
-            st.session_state["log_qty"] = qty
+            st.session_state["log_qty"] = float(qty)
             
             # 아이템이 선택되었으므로 카테고리/단위도 자동 설정
             db = load_item_db()
@@ -548,11 +551,11 @@ if "voice_input" in st.query_params:
                     st.session_state["log_category"] = row["category"]
                     st.session_state["unit_select"] = row["unit"]
                     break
-            st.success(f"🎤 Identified: {item} ({qty})")
+            st.success(f"🎤 Voice Identified: {item} ({qty})")
         else:
             st.warning(f"Could not find matching item for: {voice_text}")
     
-    # 처리 완료 후 파라미터 제거 (무한 루프 방지)
+    # 처리 완료 후 파라미터 제거
     st.query_params.clear()
 
 # ================= Data Load / Save ==================
@@ -708,21 +711,23 @@ if tab1:
         
         # 아이템 변경 감지 -> 데이터 로드 또는 초기화
         if st.session_state.last_loaded_key != full_key:
-            if not existing_row.empty:
-                # DB 값 불러오기
-                st.session_state["qty"] = float(existing_row.iloc[0]["CurrentQty"])
-                st.session_state["min_qty"] = float(existing_row.iloc[0]["MinQty"])
-                st.session_state["note"] = str(existing_row.iloc[0]["Note"])
-            else:
-                # 신규 -> 초기화
-                st.session_state["qty"] = 0.0
-                st.session_state["min_qty"] = 0.0
-                st.session_state["note"] = ""
+            # 음성 인식이 아닐 때만 DB 값을 불러와서 덮어씀
+            if not st.session_state.get("voice_active", False):
+                if not existing_row.empty:
+                    # DB 값 불러오기
+                    st.session_state["qty"] = float(existing_row.iloc[0]["CurrentQty"])
+                    st.session_state["min_qty"] = float(existing_row.iloc[0]["MinQty"])
+                    st.session_state["note"] = str(existing_row.iloc[0]["Note"])
+                else:
+                    # 신규 -> 초기화
+                    st.session_state["qty"] = 0.0
+                    st.session_state["min_qty"] = 0.0
+                    st.session_state["note"] = ""
             
             st.session_state.last_loaded_key = full_key
-            # 값을 설정했으므로, 아래 위젯들이 이 값을 물고 렌더링됨.
-            # 하지만 확실한 UI 갱신을 위해 rerun 할 수도 있으나, 
-            # widget key가 설정된 상태에서 값 update후 렌더링이면 반영됨.
+            # 음성 인식 모드 종료 (한 번 반영되었으므로)
+            if "voice_active" in st.session_state:
+                del st.session_state["voice_active"]
 
         if not existing_row.empty:
             is_update = True
