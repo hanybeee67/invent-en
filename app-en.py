@@ -181,18 +181,31 @@ SPREADSHEET_NAME = "Everest_Inventory_DB"  # Updated to match actual spreadsheet
 
 @st.cache_resource
 def get_gspread_client():
-    if not os.path.exists(GOOGLE_KEYS_FILE):
-        return None
     scopes = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
-    try:
-        creds = Credentials.from_service_account_file(GOOGLE_KEYS_FILE, scopes=scopes)
-        return gspread.authorize(creds)
-    except Exception as e:
-        st.error(f"Google Auth Error: {e}")
-        return None
+    
+    # 1. Try Streamlit Secrets (for Cloud Deployment)
+    if "gcp_service_account" in st.secrets:
+        try:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+            return gspread.authorize(creds)
+        except Exception as e:
+            st.error(f"Streamlit Secrets Auth Error: {e}")
+
+    # 2. Try Local File Fallback
+    if os.path.exists(GOOGLE_KEYS_FILE):
+        try:
+            creds = Credentials.from_service_account_file(GOOGLE_KEYS_FILE, scopes=scopes)
+            return gspread.authorize(creds)
+        except Exception as e:
+            st.error(f"Google Auth Local File Error: {e}")
+            return None
+    
+    st.error("No Google Sheets credentials found. Please set 'gcp_service_account' in Streamlit Secrets or provide 'google_keys.json' locally.")
+    return None
 
 def get_sheet(sheet_name):
     client = get_gspread_client()
