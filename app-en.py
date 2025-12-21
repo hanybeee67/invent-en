@@ -177,7 +177,7 @@ ITEM_FILE = "food ingredients.txt"        # (백업용 로컬 경로 유지)
 
 # 구글 스프레드시트 설정
 GOOGLE_KEYS_FILE = "google_keys.json"
-SPREADSHEET_NAME = "Everest_Inventory_DB"
+SPREADSHEET_NAME = "Everest_DB"  # 사용자 요청에 따라 변경
 
 @st.cache_resource
 def get_gspread_client():
@@ -187,17 +187,33 @@ def get_gspread_client():
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
-    creds = Credentials.from_service_account_file(GOOGLE_KEYS_FILE, scopes=scopes)
-    return gspread.authorize(creds)
+    try:
+        creds = Credentials.from_service_account_file(GOOGLE_KEYS_FILE, scopes=scopes)
+        return gspread.authorize(creds)
+    except Exception as e:
+        st.error(f"Google Auth Error: {e}")
+        return None
 
 def get_sheet(sheet_name):
     client = get_gspread_client()
     if client:
         try:
             sh = client.open(SPREADSHEET_NAME)
-            return sh.worksheet(sheet_name)
+            # 1. 먼저 정확한 이름으로 시도
+            try:
+                return sh.worksheet(sheet_name)
+            except:
+                # 2. 실패 시 모든 시트 목록을 가져와서 가장 유사한(대소문자 무시 등) 이름 찾기
+                worksheets = sh.worksheets()
+                for ws in worksheets:
+                    if ws.title.lower().strip().replace("_", "") == sheet_name.lower().strip().replace("_", ""):
+                        return ws
+                # 3. 그래도 없으면 첫 번째 시트라도 반환 (식자재 리스트일 가능성 높음)
+                if sheet_name == "food_ingredients":
+                    return worksheets[0]
+                raise Exception(f"Worksheet '{sheet_name}' not found.")
         except Exception as e:
-            st.error(f"Error opening sheet {sheet_name}: {e}")
+            st.error(f"Error opening spreadsheet '{SPREADSHEET_NAME}' or sheet '{sheet_name}': {e}")
     return None
 
 # ================= Login Logic ==================
@@ -371,15 +387,24 @@ def load_item_db():
     if sheet:
         try:
             records = sheet.get_all_records()
+            if not records:
+                st.info("💡 'food_ingredients' 시트가 비어있습니다. 데이터를 입력해 주세요.")
+            
             for row in records:
-                cat = row.get("Category", "")
-                item = row.get("Item", "")
-                unit = row.get("Unit", "")
+                # 대소문자 구분 없이 매칭하기 위해 모든 키를 소문자로 변환한 딕셔너리 생성
+                row_lower = {k.lower(): v for k, v in row.items()}
+                cat = row_lower.get("category", "")
+                item = row_lower.get("item", "")
+                unit = row_lower.get("unit", "")
+                
                 if cat and item:
                     items.append({"category": cat, "item": item, "unit": unit})
-            return items
+            
+            if items:
+                return items
         except Exception as e:
-            st.error(f"Error reading from Google Sheet: {e}")
+            st.error(f"Error reading from Google Sheet ('food_ingredients'): {e}")
+            st.warning("스프레드시트의 첫 번째 줄(헤더)이 'Category', 'Item', 'Unit'으로 되어 있는지 확인해 주세요.")
     
     # 스프레드시트 실패 시 로컬 파일 백업 로드
     if os.path.exists(ITEM_FILE):
@@ -420,13 +445,25 @@ def load_inventory():
     sheet = get_sheet("inventory_data")
     if sheet:
         try:
-            df = pd.DataFrame(sheet.get_all_records())
-            if not df.empty:
-                for col in expected:
-                    if col not in df.columns:
-                        df[col] = ""
+            records = sheet.get_all_records()
+            if records:
+                # 대소문자 구분 없는 매칭을 위해 컬럼명 변환
+                df_raw = pd.DataFrame(records)
+                df = pd.DataFrame(columns=expected)
+                
+                # 원본 데이터의 컬럼명들을 소문자로 매칭하여 복사
+                raw_cols_lower = {c.lower(): c for c in df_raw.columns}
+                for exp_col in expected:
+                    lower_exp = exp_col.lower()
+                    if lower_exp in raw_cols_lower:
+                        df[exp_col] = df_raw[raw_cols_lower[lower_exp]]
+                    else:
+                        df[exp_col] = ""
                 return df[expected]
-        except: pass
+            else:
+                st.info("💡 'inventory_data' 시트에 데이터가 없습니다. 로컬 백업을 확인합니다.")
+        except Exception as e:
+            st.error(f"Error reading 'inventory_data' sheet: {e}")
 
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
@@ -454,13 +491,23 @@ def load_history():
     sheet = get_sheet("stock_history")
     if sheet:
         try:
-            df = pd.DataFrame(sheet.get_all_records())
-            if not df.empty:
-                for col in expected:
-                    if col not in df.columns:
-                        df[col] = ""
+            records = sheet.get_all_records()
+            if records:
+                df_raw = pd.DataFrame(records)
+                df = pd.DataFrame(columns=expected)
+                
+                raw_cols_lower = {c.lower(): c for c in df_raw.columns}
+                for exp_col in expected:
+                    lower_exp = exp_col.lower()
+                    if lower_exp in raw_cols_lower:
+                        df[exp_col] = df_raw[raw_cols_lower[lower_exp]]
+                    else:
+                        df[exp_col] = ""
                 return df[expected]
-        except: pass
+            else:
+                st.info("💡 'stock_history' 시트에 데이터가 없습니다. 로컬 백업을 확인합니다.")
+        except Exception as e:
+            st.error(f"Error reading 'stock_history' sheet: {e}")
 
     if os.path.exists(HISTORY_FILE):
         df = pd.read_csv(HISTORY_FILE)
