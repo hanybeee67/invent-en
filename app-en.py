@@ -380,44 +380,42 @@ html, body, [class*="css"] {
 # ================= Load item DB from file ==================
 def load_item_db():
     """
-    구글 스프레드시트의 'food_ingredients' 시트에서 데이터를 읽어옵니다.
+    구글 스프레드시트의 'food_ingredients' 및 'inventory_data' 시트에서 데이터를 읽어와서
+    카테고리, 아이템, 단위 목록을 생성합니다.
     """
     items = []
-    sheet = get_sheet("food_ingredients")
-    if sheet:
+    # 1. 'food_ingredients' 시트 시도
+    sheet_ingredients = get_sheet("food_ingredients")
+    if sheet_ingredients:
         try:
-            records = sheet.get_all_records()
-            if not records:
-                st.info("💡 'food_ingredients' 시트가 비어있습니다. 데이터를 입력해 주세요.")
-            
+            records = sheet_ingredients.get_all_records()
             for row in records:
-                # Use a more flexible way to find Category, Item, and Unit
                 row_lower = {str(k).lower().strip(): v for k, v in row.items()}
-                
-                # Try multiple possible header names just in case
                 cat = row_lower.get("category", "") or row_lower.get("cat", "")
                 item = row_lower.get("item", "") or row_lower.get("item name", "")
                 unit = row_lower.get("unit", "")
-                
                 if str(cat).strip() and str(item).strip():
                     items.append({"category": str(cat).strip(), "item": str(item).strip(), "unit": str(unit).strip()})
-            
-            if items:
-                # Remove duplicates if any
-                unique_items = []
-                seen = set()
-                for i in items:
-                    key = (i["category"], i["item"])
-                    if key not in seen:
-                        unique_items.append(i)
-                        seen.add(key)
-                return unique_items
         except Exception as e:
-            st.error(f"Error reading from Google Sheet ('food_ingredients'): {e}")
-            st.warning("스프레드시트의 'food_ingredients' 시트 헤더가 'Category', 'Item', 'Unit'으로 되어 있는지 확인해 주세요.")
-    
-    # 스프레드시트 실패 시 로컬 파일 백업 로드
-    if os.path.exists(ITEM_FILE):
+            st.error(f"Error reading 'food_ingredients': {e}")
+
+    # 2. 'inventory_data' 시트에서 추가 추출 (아이템 누락 방지)
+    sheet_inventory = get_sheet("inventory_data")
+    if sheet_inventory:
+        try:
+            records = sheet_inventory.get_all_records()
+            for row in records:
+                row_lower = {str(k).lower().strip(): v for k, v in row.items()}
+                cat = row_lower.get("category", "")
+                item = row_lower.get("item", "")
+                unit = row_lower.get("unit", "")
+                if str(cat).strip() and str(item).strip():
+                    items.append({"category": str(cat).strip(), "item": str(item).strip(), "unit": str(unit).strip()})
+        except Exception as e:
+            st.error(f"Error reading 'inventory_data' for items: {e}")
+
+    # 3. 로컬 파일 백업 (최종 수단)
+    if not items and os.path.exists(ITEM_FILE):
         try:
             with open(ITEM_FILE, "r", encoding="utf-8") as f:
                 for line in f:
@@ -427,6 +425,17 @@ def load_item_db():
                         items.append({"category": parts[0], "item": parts[1], "unit": parts[2] if len(parts) >= 3 else ""})
         except: pass
             
+    # 중복 제거 및 정렬
+    if items:
+        unique_items = []
+        seen = set()
+        for i in items:
+            key = (i["category"], i["item"])
+            if key not in seen:
+                unique_items.append(i)
+                seen.add(key)
+        return sorted(unique_items, key=lambda x: (x["category"], x["item"]))
+    
     return items
 
 def get_all_categories():
@@ -601,6 +610,20 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📄 Monthly Report",
     "💾 Data Management"
 ])
+
+# ================= Tab 6 (Data Management) logic moved up slightly for better organization ==================
+with tab6:
+    st.subheader("Google Sheets Sync & Data Management")
+    if st.button("🔄 Refresh Data from Google Sheets"):
+        # Clear all related session states to force reload
+        keys_to_clear = ["inventory", "history", "last_loaded_key", "last_selected_item"]
+        for k in keys_to_clear:
+            if k in st.session_state:
+                del st.session_state[k]
+        st.cache_resource.clear()
+        st.success("Data reloaded from Google Sheets!")
+        st.rerun()
+    st.info("If data from the spreadsheet is not showing up properly, please click the refresh button above.")
 
 # ======================================================
 # TAB 1: Register / Edit Inventory (Manager Only)
