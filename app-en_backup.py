@@ -143,30 +143,8 @@ if not st.session_state["splash_shown"]:
 
 # ================= Ingredient Database (기본 하드코딩 백업) ==================
 # ================= Ingredient Database (기본 하드코딩 백업) ==================
-ingredient_list = [
-    {"category": "Meat", "item": "Chicken", "unit": "kg"},
-    {"category": "Meat", "item": "Mutton", "unit": "kg"},
-    {"category": "Meat", "item": "Pork", "unit": "kg"},
-    {"category": "Meat", "item": "Buffalo", "unit": "kg"},
-    {"category": "Meat", "item": "Fish", "unit": "kg"},
-    {"category": "Vegetable", "item": "Onion", "unit": "kg"},
-    {"category": "Vegetable", "item": "Tomato", "unit": "kg"},
-    {"category": "Vegetable", "item": "Potato", "unit": "kg"},
-    {"category": "Vegetable", "item": "Garlic", "unit": "kg"},
-    {"category": "Vegetable", "item": "Ginger", "unit": "kg"},
-    {"category": "Vegetable", "item": "Cabbage", "unit": "kg"},
-    {"category": "Spices", "item": "Salt", "unit": "kg"},
-    {"category": "Spices", "item": "Sugar", "unit": "kg"},
-    {"category": "Spices", "item": "Cumin Powder", "unit": "kg"},
-    {"category": "Spices", "item": "Turmeric Powder", "unit": "kg"},
-    {"category": "Spices", "item": "Chili Powder", "unit": "kg"},
-    {"category": "Dairy", "item": "Milk", "unit": "L"},
-    {"category": "Dairy", "item": "Yogurt", "unit": "L"},
-    {"category": "Dairy", "item": "Paneer", "unit": "kg"},
-    {"category": "Others", "item": "Rice", "unit": "kg"},
-    {"category": "Others", "item": "Flour", "unit": "kg"},
-    {"category": "Others", "item": "Cooking Oil", "unit": "L"},
-]
+# ================= Ingredient Database (빈 상태로 시작) ==================
+ingredient_list = []
 
 # ================= Files ==================
 DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
@@ -359,17 +337,6 @@ def load_item_db():
         except Exception as e:
             st.error(f"Error reading {ITEM_FILE}: {e}")
     
-    # 2. 기본 리스트(ingredient_list) 병합 (중복 방지)
-    existing_keys = set((i["category"].lower(), i["item"].lower()) for i in items)
-    
-    for default in ingredient_list:
-        if (default["category"].lower(), default["item"].lower()) not in existing_keys:
-            items.append({
-                "category": default["category"], 
-                "item": default["item"], 
-                "unit": default.get("unit", "") 
-            })
-            
     return items
 
 def get_all_categories():
@@ -932,9 +899,9 @@ if tab6:
             st.markdown("---")
             st.markdown("### 2. Emergency Recovery")
             st.warning("If file upload fails due to network issues, you can initialize the database with basic default ingredients.")
-            if st.button("🚀 Initialize with Default Ingredients", key="init_defaults"):
+            if st.button("🚀 Initialize with Sample Data", key="init_defaults"):
                 with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                    for d in ingredient_list:
-                        f.write(f"{d['category']}\t{d['item']}\t{d['unit']}\n")
-                st.success("Default database created! Reloading...")
+                    f.write("Vegetable\tOnion\tkg\n")
+                    f.write("Meat\tChicken\tkg\n")
+                st.success("Sample database created! Reloading...")
                 st.rerun()
