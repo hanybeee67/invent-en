@@ -3,6 +3,8 @@ import pandas as pd
 import os
 from datetime import date, datetime
 import io
+import gspread
+from google.oauth2.service_account import Credentials
 
 # ================= Page Config ==================
 st.set_page_config(
@@ -168,10 +170,35 @@ ingredient_list = [
     {"category": "Others", "item": "Cooking Oil", "unit": "L"},
 ]
 
-# ================= Files ==================
-DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
-HISTORY_FILE = "stock_history.csv"        # 입출고 로그
-ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
+# ================= Files & Google Sheets Config ==================
+DATA_FILE = "inventory_data.csv"          # (백업용 로컬 경로 유지)
+HISTORY_FILE = "stock_history.csv"        # (백업용 로컬 경로 유지)
+ITEM_FILE = "food ingredients.txt"        # (백업용 로컬 경로 유지)
+
+# 구글 스프레드시트 설정
+GOOGLE_KEYS_FILE = "google_keys.json"
+SPREADSHEET_NAME = "Everest_Inventory_DB"
+
+@st.cache_resource
+def get_gspread_client():
+    if not os.path.exists(GOOGLE_KEYS_FILE):
+        return None
+    scopes = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
+    creds = Credentials.from_service_account_file(GOOGLE_KEYS_FILE, scopes=scopes)
+    return gspread.authorize(creds)
+
+def get_sheet(sheet_name):
+    client = get_gspread_client()
+    if client:
+        try:
+            sh = client.open(SPREADSHEET_NAME)
+            return sh.worksheet(sheet_name)
+        except Exception as e:
+            st.error(f"Error opening sheet {sheet_name}: {e}")
+    return None
 
 # ================= Login Logic ==================
 if "logged_in" not in st.session_state:
@@ -337,14 +364,24 @@ html, body, [class*="css"] {
 # ================= Load item DB from file ==================
 def load_item_db():
     """
-    food ingredients.txt 형식:
-    Category<TAB>Item<TAB>Unit
-    
-    기본 ingredient_list와 파일 내용을 병합하여 반환함.
+    구글 스프레드시트의 'food_ingredients' 시트에서 데이터를 읽어옵니다.
     """
     items = []
+    sheet = get_sheet("food_ingredients")
+    if sheet:
+        try:
+            records = sheet.get_all_records()
+            for row in records:
+                cat = row.get("Category", "")
+                item = row.get("Item", "")
+                unit = row.get("Unit", "")
+                if cat and item:
+                    items.append({"category": cat, "item": item, "unit": unit})
+            return items
+        except Exception as e:
+            st.error(f"Error reading from Google Sheet: {e}")
     
-    # 1. 파일 로드
+    # 스프레드시트 실패 시 로컬 파일 백업 로드
     if os.path.exists(ITEM_FILE):
         try:
             with open(ITEM_FILE, "r", encoding="utf-8") as f:
@@ -352,15 +389,8 @@ def load_item_db():
                     if not line.strip(): continue
                     parts = [p.strip() for p in line.split("\t")]
                     if len(parts) >= 2:
-                        cat = parts[0]
-                        item = parts[1]
-                        unit = parts[2] if len(parts) >= 3 else ""
-                        items.append({"category": cat, "item": item, "unit": unit})
-        except Exception as e:
-            st.error(f"Error reading {ITEM_FILE}: {e}")
-    
-    # 2. 기본 리스트(ingredient_list) 병합 제거 (사용자 요청: 파일 데이터만 사용)
-    # 기존 코드: ingredient_list와 병합하던 로직을 삭제함
+                        items.append({"category": parts[0], "item": parts[1], "unit": parts[2] if len(parts) >= 3 else ""})
+        except: pass
             
     return items
 
@@ -385,34 +415,72 @@ def get_unit_for_item(category, item):
             return i["unit"]
     return ""
 
-# ================= Data Load / Save ==================
 def load_inventory():
+    expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+    sheet = get_sheet("inventory_data")
+    if sheet:
+        try:
+            df = pd.DataFrame(sheet.get_all_records())
+            if not df.empty:
+                for col in expected:
+                    if col not in df.columns:
+                        df[col] = ""
+                return df[expected]
+        except: pass
+
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
-        expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
         for col in expected:
             if col not in df.columns:
                 df[col] = ""
         return df[expected]
-    else:
-        return pd.DataFrame(columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"])
+    return pd.DataFrame(columns=expected)
 
 def save_inventory(df):
+    # 로컬 백업
     df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
+    # 구글 시트 업데이트
+    sheet = get_sheet("inventory_data")
+    if sheet:
+        try:
+            sheet.clear()
+            # 헤더 포함 전체 데이터 쓰기
+            sheet.update([df.columns.values.tolist()] + df.values.tolist())
+        except Exception as e:
+            st.error(f"Google Sheet Save Error: {e}")
 
 def load_history():
+    expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
+    sheet = get_sheet("stock_history")
+    if sheet:
+        try:
+            df = pd.DataFrame(sheet.get_all_records())
+            if not df.empty:
+                for col in expected:
+                    if col not in df.columns:
+                        df[col] = ""
+                return df[expected]
+        except: pass
+
     if os.path.exists(HISTORY_FILE):
         df = pd.read_csv(HISTORY_FILE)
-        expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
         for col in expected:
             if col not in df.columns:
                 df[col] = ""
         return df[expected]
-    else:
-        return pd.DataFrame(columns=["Date","Branch","Category","Item","Unit","Type","Qty"])
+    return pd.DataFrame(columns=expected)
 
 def save_history(df):
+    # 로컬 백업
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
+    # 구글 시트 업데이트
+    sheet = get_sheet("stock_history")
+    if sheet:
+        try:
+            sheet.clear()
+            sheet.update([df.columns.values.tolist()] + df.values.tolist())
+        except Exception as e:
+            st.error(f"Google Sheet Save Error: {e}")
 
 # ================= Session Init ==================
 if "inventory" not in st.session_state:

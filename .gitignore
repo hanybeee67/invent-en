@@ -1,0 +1,23 @@
+# Google Sheets API keys
+google_keys.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv
+venv/
+ENV/
+
+# Streamlit
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (Optional: if you don't want to push local csv backups)
+# inventory_data.csv
+# stock_history.csv
+# food ingredients.txt
