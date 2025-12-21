@@ -3,8 +3,6 @@ import pandas as pd
 import os
 from datetime import date, datetime
 import io
-import gspread
-from google.oauth2.service_account import Credentials
 
 # ================= Page Config ==================
 st.set_page_config(
@@ -170,73 +168,10 @@ ingredient_list = [
     {"category": "Others", "item": "Cooking Oil", "unit": "L"},
 ]
 
-# ================= Files & Google Sheets Config ==================
-DATA_FILE = "inventory_data.csv"          # (백업용 로컬 경로 유지)
-HISTORY_FILE = "stock_history.csv"        # (백업용 로컬 경로 유지)
-ITEM_FILE = "food ingredients.txt"        # (백업용 로컬 경로 유지)
-
-# 구글 스프레드시트 설정
-GOOGLE_KEYS_FILE = "google_keys.json"
-SPREADSHEET_NAME = "Everest_Inventory_DB"  # Updated to match actual spreadsheet name
-
-@st.cache_resource
-def get_gspread_client():
-    scopes = [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive'
-    ]
-    
-    # 1. Try Streamlit Secrets (for Cloud Deployment)
-    if "gcp_service_account" in st.secrets:
-        try:
-            import json
-            secret_data = st.secrets["gcp_service_account"]
-            
-            # If it's a string (raw JSON pasted), parse it
-            if isinstance(secret_data, str):
-                creds_info = json.loads(secret_data)
-            else:
-                # If it's already a dict-like object (TOML format)
-                creds_info = dict(secret_data)
-                
-            creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
-            return gspread.authorize(creds)
-        except Exception as e:
-            st.error(f"Streamlit Secrets Auth Error: {e}")
-
-    # 2. Try Local File Fallback
-    if os.path.exists(GOOGLE_KEYS_FILE):
-        try:
-            creds = Credentials.from_service_account_file(GOOGLE_KEYS_FILE, scopes=scopes)
-            return gspread.authorize(creds)
-        except Exception as e:
-            st.error(f"Google Auth Local File Error: {e}")
-            return None
-    
-    st.error("No Google Sheets credentials found. Please set 'gcp_service_account' in Streamlit Secrets or provide 'google_keys.json' locally.")
-    return None
-
-def get_sheet(sheet_name):
-    client = get_gspread_client()
-    if client:
-        try:
-            sh = client.open(SPREADSHEET_NAME)
-            # 1. 먼저 정확한 이름으로 시도
-            try:
-                return sh.worksheet(sheet_name)
-            except:
-                # 2. 실패 시 모든 시트 목록을 가져와서 가장 유사한(대소문자 무시 등) 이름 찾기
-                worksheets = sh.worksheets()
-                for ws in worksheets:
-                    if ws.title.lower().strip().replace("_", "") == sheet_name.lower().strip().replace("_", ""):
-                        return ws
-                # 3. 그래도 없으면 첫 번째 시트라도 반환 (식자재 리스트일 가능성 높음)
-                if sheet_name == "food_ingredients":
-                    return worksheets[0]
-                raise Exception(f"Worksheet '{sheet_name}' not found.")
-        except Exception as e:
-            st.error(f"Error opening spreadsheet '{SPREADSHEET_NAME}' or sheet '{sheet_name}': {e}")
-    return None
+# ================= Files ==================
+DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
+HISTORY_FILE = "stock_history.csv"        # 입출고 로그
+ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
 
 # ================= Login Logic ==================
 if "logged_in" not in st.session_state:
@@ -402,73 +337,48 @@ html, body, [class*="css"] {
 # ================= Load item DB from file ==================
 def load_item_db():
     """
-    구글 스프레드시트의 'food_ingredients' 및 'inventory_data' 시트에서 데이터를 읽어와서
-    카테고리, 아이템, 단위 목록을 생성합니다.
+    food ingredients.txt 형식:
+    Category<TAB>Item<TAB>Unit
+    
+    기본 ingredient_list와 파일 내용을 병합하여 반환함.
     """
     items = []
-    # 1. 'food_ingredients' 시트 시도
-    sheet_ingredients = get_sheet("food_ingredients")
-    if sheet_ingredients:
-        try:
-            records = sheet_ingredients.get_all_records()
-            for row in records:
-                row_lower = {str(k).lower().strip(): v for k, v in row.items()}
-                cat = row_lower.get("category", "") or row_lower.get("cat", "")
-                item = row_lower.get("item", "") or row_lower.get("item name", "")
-                unit = row_lower.get("unit", "")
-                if str(cat).strip() and str(item).strip():
-                    items.append({"category": str(cat).strip(), "item": str(item).strip(), "unit": str(unit).strip()})
-        except Exception as e:
-            st.error(f"Error reading 'food_ingredients': {e}")
-
-    # 2. 'inventory_data' 시트에서 추가 추출 (아이템 누락 방지)
-    sheet_inventory = get_sheet("inventory_data")
-    if sheet_inventory:
-        try:
-            records = sheet_inventory.get_all_records()
-            for row in records:
-                row_lower = {str(k).lower().strip(): v for k, v in row.items()}
-                cat = row_lower.get("category", "")
-                item = row_lower.get("item", "")
-                unit = row_lower.get("unit", "")
-                if str(cat).strip() and str(item).strip():
-                    items.append({"category": str(cat).strip(), "item": str(item).strip(), "unit": str(unit).strip()})
-        except Exception as e:
-            st.error(f"Error reading 'inventory_data' for items: {e}")
-
-    # 3. 로컬 파일 백업 (최종 수단)
-    if not items and os.path.exists(ITEM_FILE):
+    
+    # 1. 파일 로드
+    if os.path.exists(ITEM_FILE):
         try:
             with open(ITEM_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     if not line.strip(): continue
                     parts = [p.strip() for p in line.split("\t")]
                     if len(parts) >= 2:
-                        items.append({"category": parts[0], "item": parts[1], "unit": parts[2] if len(parts) >= 3 else ""})
-        except: pass
-            
-    # 중복 제거 및 정렬
-    if items:
-        unique_items = []
-        seen = set()
-        for i in items:
-            key = (i["category"], i["item"])
-            if key not in seen:
-                unique_items.append(i)
-                seen.add(key)
-        return sorted(unique_items, key=lambda x: (x["category"], x["item"]))
+                        cat = parts[0]
+                        item = parts[1]
+                        unit = parts[2] if len(parts) >= 3 else ""
+                        items.append({"category": cat, "item": item, "unit": unit})
+        except Exception as e:
+            st.error(f"Error reading {ITEM_FILE}: {e}")
     
+    # 2. 기본 리스트(ingredient_list) 병합 (중복 방지)
+    existing_keys = set((i["category"].lower(), i["item"].lower()) for i in items)
+    
+    for default in ingredient_list:
+        if (default["category"].lower(), default["item"].lower()) not in existing_keys:
+            items.append({
+                "category": default["category"], 
+                "item": default["item"], 
+                "unit": default.get("unit", "") 
+            })
+            
     return items
 
 def get_all_categories():
     db = load_item_db()
-    # Ensure all values are strings and filter out empty strings
-    return sorted(set([str(i["category"]) for i in db if i.get("category")]))
+    return sorted(set([i["category"] for i in db]))
 
 def get_all_units():
     db = load_item_db()
-    # Ensure all values are strings and filter out empty strings
-    return sorted(set([str(i["unit"]) for i in db if i.get("unit")]))
+    return sorted(set([i["unit"] for i in db if i["unit"]]))
 
 def get_items_by_category(category):
     db = load_item_db()
@@ -481,99 +391,34 @@ def get_unit_for_item(category, item):
             return i["unit"]
     return ""
 
+# ================= Data Load / Save ==================
 def load_inventory():
-    expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
-    sheet = get_sheet("inventory_data")
-    if sheet:
-        try:
-            records = sheet.get_all_records()
-            if records:
-                # 대소문자 구분 없는 매칭을 위해 컬럼명 변환
-                df_raw = pd.DataFrame(records)
-                df = pd.DataFrame(columns=expected)
-                
-                # 원본 데이터의 컬럼명들을 소문자로 매칭하여 복사
-                raw_cols_lower = {str(c).lower().strip(): c for c in df_raw.columns}
-                for exp_col in expected:
-                    lower_exp = exp_col.lower()
-                    if lower_exp in raw_cols_lower:
-                        df[exp_col] = df_raw[raw_cols_lower[lower_exp]]
-                    else:
-                        df[exp_col] = ""
-                
-                # Ensure CurrentQty and MinQty are numeric
-                df["CurrentQty"] = pd.to_numeric(df["CurrentQty"], errors="coerce").fillna(0)
-                df["MinQty"] = pd.to_numeric(df["MinQty"], errors="coerce").fillna(0)
-                
-                return df[expected]
-            else:
-                st.info("💡 'inventory_data' 시트에 데이터가 없습니다. 로컬 백업을 확인합니다.")
-        except Exception as e:
-            st.error(f"Error reading 'inventory_data' sheet: {e}")
-
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
+        expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
         for col in expected:
             if col not in df.columns:
                 df[col] = ""
         return df[expected]
-    return pd.DataFrame(columns=expected)
+    else:
+        return pd.DataFrame(columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"])
 
 def save_inventory(df):
-    # 로컬 백업
     df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
-    # 구글 시트 업데이트
-    sheet = get_sheet("inventory_data")
-    if sheet:
-        try:
-            sheet.clear()
-            # 헤더 포함 전체 데이터 쓰기
-            sheet.update([df.columns.values.tolist()] + df.values.tolist())
-        except Exception as e:
-            st.error(f"Google Sheet Save Error: {e}")
 
 def load_history():
-    expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
-    sheet = get_sheet("stock_history")
-    if sheet:
-        try:
-            records = sheet.get_all_records()
-            if records:
-                df_raw = pd.DataFrame(records)
-                df = pd.DataFrame(columns=expected)
-                
-                raw_cols_lower = {c.lower(): c for c in df_raw.columns}
-                for exp_col in expected:
-                    lower_exp = exp_col.lower()
-                    if lower_exp in raw_cols_lower:
-                        df[exp_col] = df_raw[raw_cols_lower[lower_exp]]
-                    else:
-                        df[exp_col] = ""
-                return df[expected]
-            else:
-                st.info("💡 'stock_history' 시트에 데이터가 없습니다. 로컬 백업을 확인합니다.")
-        except Exception as e:
-            st.error(f"Error reading 'stock_history' sheet: {e}")
-
     if os.path.exists(HISTORY_FILE):
         df = pd.read_csv(HISTORY_FILE)
+        expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
         for col in expected:
             if col not in df.columns:
                 df[col] = ""
         return df[expected]
-    return pd.DataFrame(columns=expected)
+    else:
+        return pd.DataFrame(columns=["Date","Branch","Category","Item","Unit","Type","Qty"])
 
 def save_history(df):
-    # 로컬 백업
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
-    # 구글 시트 업데이트
-    sheet = get_sheet("stock_history")
-    if sheet:
-        try:
-            sheet.clear()
-            sheet.update([df.columns.values.tolist()] + df.values.tolist())
-        except Exception as e:
-            st.error(f"Google Sheet Save Error: {e}")
 
 # ================= Session Init ==================
 if "inventory" not in st.session_state:
@@ -632,20 +477,6 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📄 Monthly Report",
     "💾 Data Management"
 ])
-
-# ================= Tab 6 (Data Management) logic moved up slightly for better organization ==================
-with tab6:
-    st.subheader("Google Sheets Sync & Data Management")
-    if st.button("🔄 Refresh Data from Google Sheets"):
-        # Clear all related session states to force reload
-        keys_to_clear = ["inventory", "history", "last_loaded_key", "last_selected_item"]
-        for k in keys_to_clear:
-            if k in st.session_state:
-                del st.session_state[k]
-        st.cache_resource.clear()
-        st.success("Data reloaded from Google Sheets!")
-        st.rerun()
-    st.info("If data from the spreadsheet is not showing up properly, please click the refresh button above.")
 
 # ======================================================
 # TAB 1: Register / Edit Inventory (Manager Only)
@@ -789,14 +620,11 @@ with tab2:
     if branch_filter != "All":
         df = df[df["Branch"] == branch_filter]
     
-    # NaN 방지 및 문자열 변환 후 정렬
-    categories_list = sorted(set(df["Category"].fillna("").astype(str)))
-    category_filter = st.selectbox("Category", ["All"] + [c for c in categories_list if c], key="view_cat")
+    category_filter = st.selectbox("Category", ["All"] + sorted(set(df["Category"])), key="view_cat")
     if category_filter != "All":
         df = df[df["Category"] == category_filter]
     
-    items_list = sorted(set(df["Item"].fillna("").astype(str)))
-    item_filter = st.selectbox("Item", ["All"] + [i for i in items_list if i], key="view_item")
+    item_filter = st.selectbox("Item", ["All"] + sorted(set(df["Item"])), key="view_item")
     if item_filter != "All":
         df = df[df["Item"] == item_filter]
     
@@ -887,10 +715,9 @@ with tab4:
                 sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
             with a2:
                 sel_cat = st.selectbox("Category", ["All"] + get_all_categories(), key="ana_cat")
-                # 기간 선택 (월 단위) - NaN/NaT 제거
-                year_options = sorted(set(history_df["DateObj"].dt.year.dropna().astype(int)))
-                if not year_options:
-                    year_options = [datetime.now().year]
+            with a3:
+                # 기간 선택 (월 단위)
+                year_options = sorted(set(history_df["DateObj"].dt.year))
                 sel_year = st.selectbox("Year", year_options, index=len(year_options)-1, key="ana_year")
                 sel_month = st.selectbox("Month", list(range(1,13)), index=datetime.now().month-1, key="ana_month")
 
@@ -1038,99 +865,76 @@ if tab6:
             # 입력 방식 선택
             input_mode = st.radio("Choose Input Method", ["Excel File Upload", "Copy & Paste from Excel"], key="input_mode", horizontal=True)
 
-            # 세션 스테이트 초기화
-            if 'bulk_df' not in st.session_state:
-                st.session_state.bulk_df = None
+            new_df = None
 
             if input_mode == "Excel File Upload":
+                # 2. 파일 업로드 및 처리
                 uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
                 if uploaded_file is not None:
                     try:
-                        temp_df = pd.read_excel(uploaded_file)
-                        # 표준 컬럼 정규화
-                        col_map = {c.lower().strip(): c for c in temp_df.columns}
-                        cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
-                        item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
-                        unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
-
-                        if cat_col and item_col:
-                            process_df = pd.DataFrame()
-                            process_df["Category"] = temp_df[cat_col].astype(str).str.strip()
-                            process_df["Item"] = temp_df[item_col].astype(str).str.strip()
-                            process_df["Unit"] = temp_df[unit_col].astype(str).str.strip() if unit_col else ""
-                            process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
-                                                    process_df["Item"].notna() & (process_df["Item"] != "")]
-                            st.session_state.bulk_df = process_df
-                        else:
-                            st.error("Could not find required columns (Category, Item).")
+                        new_df = pd.read_excel(uploaded_file)
                     except Exception as e:
-                        st.error(f"Error reading Excel: {e}")
+                        st.error(f"Error reading Excel file: {e}")
             else:
-                pasted_text = st.text_area("Paste Excel Data Here", height=200, key="pasted_text")
+                # 복사/붙여넣기 방식
+                st.write("1. Open your Excel file.")
+                st.write("2. Select and Copy (Ctrl+C) the data (including headers: Category, Item, Unit).")
+                st.write("3. Paste (Ctrl+V) into the box below.")
+                pasted_text = st.text_area("Paste Excel Data Here", height=200, key="pasted_text", help="Copy from Excel and paste here. Tab-separated values are supported.")
                 if pasted_text:
                     try:
-                        temp_df = pd.read_csv(io.StringIO(pasted_text), sep="\t")
-                        if len(temp_df.columns) < 2: 
-                            temp_df = pd.read_csv(io.StringIO(pasted_text), sep=",")
-                        
-                        col_map = {c.lower().strip(): c for c in temp_df.columns}
-                        cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
-                        item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
-                        unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
-
-                        if cat_col and item_col:
-                            process_df = pd.DataFrame()
-                            process_df["Category"] = temp_df[cat_col].astype(str).str.strip()
-                            process_df["Item"] = temp_df[item_col].astype(str).str.strip()
-                            process_df["Unit"] = temp_df[unit_col].astype(str).str.strip() if unit_col else ""
-                            process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
-                                                    process_df["Item"].notna() & (process_df["Item"] != "")]
-                            st.session_state.bulk_df = process_df
+                        # 엑셀에서 복사하면 기본적으로 탭으로 구분됨
+                        new_df = pd.read_csv(io.StringIO(pasted_text), sep="\t")
+                        if len(new_df.columns) < 2: # 탭이 아니면 콤마 시도
+                            new_df = pd.read_csv(io.StringIO(pasted_text), sep=",")
                     except Exception as e:
-                        st.error(f"Error parsing text: {e}")
+                        st.error(f"Error parsing pasted text: {e}")
 
-            if st.session_state.bulk_df is not None:
-                st.write("### Preview of data to be applied:")
-                st.dataframe(st.session_state.bulk_df, use_container_width=True)
-                st.write(f"Total {len(st.session_state.bulk_df)} items ready to be registered.")
-                
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.button("✅ Apply to Database", key="apply_db", use_container_width=True):
-                        with st.spinner("Saving data to database..."):
-                            try:
-                                with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                                    for _, row in st.session_state.bulk_df.iterrows():
-                                        f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
-                                
-                                st.success(f"Successfully saved {len(st.session_state.bulk_df)} items!")
-                                st.balloons()
-                                # 갱신 유도
-                                st.info("Database updated. The list will be refreshed.")
-                                st.session_state.bulk_df = None # 처리 후 초기화
-                                # st.rerun() 을 바로 호출하면 success 메시지를 못 보므로 지연 처리나 수동 갱신 유도 가 나을 수 있음
-                                # 여기서는 일단 rerun 하여 반영 확인
-                                if st.button("Click here to refresh lists"):
-                                    st.rerun()
+            if new_df is not None:
+                try:
+                    st.write("Preview of data to be applied:")
+                    
+                    # 컬럼명 정규화 (대소문자 무시, 공백 제거)
+                    col_map = {c.lower().strip(): c for c in new_df.columns}
+                    
+                    # 필요한 컬럼 찾기
+                    cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
+                    item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
+                    unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
 
-                            except Exception as e:
-                                st.error(f"Failed to save data: {str(e)}")
-                with col_btn2:
-                    if st.button("❌ Clear/Cancel", key="clear_bulk", use_container_width=True):
-                        st.session_state.bulk_df = None
-                        st.rerun()
+                    if not cat_col or not item_col:
+                        st.error("Could not find 'Category' or 'Item' columns. Please check your headers.")
+                        st.dataframe(new_df.head())
+                    else:
+                        # 표준 컬럼으로 재구성
+                        process_df = pd.DataFrame()
+                        process_df["Category"] = new_df[cat_col].astype(str).str.strip()
+                        process_df["Item"] = new_df[item_col].astype(str).str.strip()
+                        process_df["Unit"] = new_df[unit_col].astype(str).str.strip() if unit_col else ""
+                        
+                        # 유효 데이터만 필터
+                        process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
+                                                process_df["Item"].notna() & (process_df["Item"] != "")]
+
+                        st.dataframe(process_df.head(), use_container_width=True)
+                        st.write(f"Total {len(process_df)} items found.")
+
+                        if st.button("✅ Apply to Database", key="apply_db"):
+                            with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                                for _, row in process_df.iterrows():
+                                    f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
+                            st.success("Successfully updated! Reloading...")
+                            st.rerun()
+
+                except Exception as e:
+                    st.error(f"Error processing file: {e}")
 
             st.markdown("---")
             st.markdown("### 2. Emergency Recovery")
             st.warning("If file upload fails due to network issues, you can initialize the database with basic default ingredients.")
             if st.button("🚀 Initialize with Default Ingredients", key="init_defaults"):
-                with st.spinner("Initializing defaults..."):
-                    try:
-                        with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                            for d in ingredient_list:
-                                f.write(f"{d['category']}\t{d['item']}\t{d['unit']}\n")
-                        st.success("Default database created!")
-                        st.balloons()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed to initialize: {str(e)}")
+                with open(ITEM_FILE, "w", encoding="utf-8") as f:
+                    for d in ingredient_list:
+                        f.write(f"{d['category']}\t{d['item']}\t{d['unit']}\n")
+                st.success("Default database created! Reloading...")
+                st.rerun()
