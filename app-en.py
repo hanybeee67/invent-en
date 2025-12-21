@@ -177,7 +177,7 @@ ITEM_FILE = "food ingredients.txt"        # (백업용 로컬 경로 유지)
 
 # 구글 스프레드시트 설정
 GOOGLE_KEYS_FILE = "google_keys.json"
-SPREADSHEET_NAME = "Everest_DB"  # 사용자 요청에 따라 변경
+SPREADSHEET_NAME = "Everest_Inventory_DB"  # Updated to match actual spreadsheet name
 
 @st.cache_resource
 def get_gspread_client():
@@ -391,20 +391,30 @@ def load_item_db():
                 st.info("💡 'food_ingredients' 시트가 비어있습니다. 데이터를 입력해 주세요.")
             
             for row in records:
-                # 대소문자 구분 없이 매칭하기 위해 모든 키를 소문자로 변환한 딕셔너리 생성
-                row_lower = {k.lower(): v for k, v in row.items()}
-                cat = row_lower.get("category", "")
-                item = row_lower.get("item", "")
+                # Use a more flexible way to find Category, Item, and Unit
+                row_lower = {str(k).lower().strip(): v for k, v in row.items()}
+                
+                # Try multiple possible header names just in case
+                cat = row_lower.get("category", "") or row_lower.get("cat", "")
+                item = row_lower.get("item", "") or row_lower.get("item name", "")
                 unit = row_lower.get("unit", "")
                 
-                if cat and item:
-                    items.append({"category": cat, "item": item, "unit": unit})
+                if str(cat).strip() and str(item).strip():
+                    items.append({"category": str(cat).strip(), "item": str(item).strip(), "unit": str(unit).strip()})
             
             if items:
-                return items
+                # Remove duplicates if any
+                unique_items = []
+                seen = set()
+                for i in items:
+                    key = (i["category"], i["item"])
+                    if key not in seen:
+                        unique_items.append(i)
+                        seen.add(key)
+                return unique_items
         except Exception as e:
             st.error(f"Error reading from Google Sheet ('food_ingredients'): {e}")
-            st.warning("스프레드시트의 첫 번째 줄(헤더)이 'Category', 'Item', 'Unit'으로 되어 있는지 확인해 주세요.")
+            st.warning("스프레드시트의 'food_ingredients' 시트 헤더가 'Category', 'Item', 'Unit'으로 되어 있는지 확인해 주세요.")
     
     # 스프레드시트 실패 시 로컬 파일 백업 로드
     if os.path.exists(ITEM_FILE):
@@ -452,13 +462,18 @@ def load_inventory():
                 df = pd.DataFrame(columns=expected)
                 
                 # 원본 데이터의 컬럼명들을 소문자로 매칭하여 복사
-                raw_cols_lower = {c.lower(): c for c in df_raw.columns}
+                raw_cols_lower = {str(c).lower().strip(): c for c in df_raw.columns}
                 for exp_col in expected:
                     lower_exp = exp_col.lower()
                     if lower_exp in raw_cols_lower:
                         df[exp_col] = df_raw[raw_cols_lower[lower_exp]]
                     else:
                         df[exp_col] = ""
+                
+                # Ensure CurrentQty and MinQty are numeric
+                df["CurrentQty"] = pd.to_numeric(df["CurrentQty"], errors="coerce").fillna(0)
+                df["MinQty"] = pd.to_numeric(df["MinQty"], errors="coerce").fillna(0)
+                
                 return df[expected]
             else:
                 st.info("💡 'inventory_data' 시트에 데이터가 없습니다. 로컬 백업을 확인합니다.")
