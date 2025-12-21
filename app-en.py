@@ -189,8 +189,17 @@ def get_gspread_client():
     # 1. Try Streamlit Secrets (for Cloud Deployment)
     if "gcp_service_account" in st.secrets:
         try:
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+            import json
+            secret_data = st.secrets["gcp_service_account"]
+            
+            # If it's a string (raw JSON pasted), parse it
+            if isinstance(secret_data, str):
+                creds_info = json.loads(secret_data)
+            else:
+                # If it's already a dict-like object (TOML format)
+                creds_info = dict(secret_data)
+                
+            creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
             return gspread.authorize(creds)
         except Exception as e:
             st.error(f"Streamlit Secrets Auth Error: {e}")
