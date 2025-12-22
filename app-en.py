@@ -626,6 +626,23 @@ with tab3:
     with c3:
         log_unit = get_unit_for_item(log_category, log_item)
         st.write(f"Unit: **{log_unit or '-'}**")
+        
+        # --- 실시간 재고 확인 로직 추가 ---
+        inv_data = st.session_state.inventory
+        current_stock_row = inv_data[
+            (inv_data["Branch"] == log_branch) & 
+            (inv_data["Category"] == log_category) & 
+            (inv_data["Item"] == log_item)
+        ]
+        
+        if not current_stock_row.empty:
+            curr_qty = float(current_stock_row.iloc[0]["CurrentQty"])
+        else:
+            curr_qty = 0.0
+            
+        st.metric(label="Current Stock (현재 재고)", value=f"{curr_qty} {log_unit}")
+        # ------------------------------
+
         log_type = st.selectbox("Type", ["IN", "OUT"], key="log_type")
         log_qty = st.number_input("Quantity", min_value=0.0, step=1.0, key="log_qty")
 
