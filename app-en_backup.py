@@ -13,7 +13,11 @@ st.set_page_config(
 
 # ================= Splash Screen Logic ==================
 if "splash_shown" not in st.session_state:
-    st.session_state["splash_shown"] = False
+    # URL 쿼리 파라미터 확인 (브라우저 새로고침 대응)
+    if st.query_params.get("skip_splash") == "true":
+        st.session_state["splash_shown"] = True
+    else:
+        st.session_state["splash_shown"] = False
 
 if not st.session_state["splash_shown"]:
     # Splash Screen CSS
@@ -135,6 +139,7 @@ if not st.session_state["splash_shown"]:
     # Full screen button (invisible due to CSS above)
     if st.button("Enter System", key="splash_btn"):
         st.session_state["splash_shown"] = True
+        st.query_params["skip_splash"] = "true"  # 새로고침 시에도 스킵되도록 설정
         st.rerun()
             
     st.stop() # Stop execution here so the rest of the app doesn't load
@@ -387,12 +392,10 @@ def load_history():
 def save_history(df):
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
 
-# ================= Session Init ==================
-if "inventory" not in st.session_state:
-    st.session_state.inventory = load_inventory()
-
-if "history" not in st.session_state:
-    st.session_state.history = load_history()
+# ================= Session & Data Refresh ==================
+# 매 리런(Rerun) 마다 최신 데이터를 파일에서 직접 읽어오도록 하여 실시간성 확보
+st.session_state.inventory = load_inventory()
+st.session_state.history = load_history()
 
 # Default role: Staff (REMOVED)
 # ...
@@ -409,12 +412,17 @@ with col_h1:
         st.markdown("<div style='font-size:2rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
 
 with col_h2:
-    st.markdown("""
-    <div style="display: flex; align-items: baseline; gap: 15px;">
-        <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">Everest Inventory</h1>
-        <p class="subtitle-text" style="margin: 0;">Professional Stock Management System</p>
-    </div>
-    """, unsafe_allow_html=True)
+    h_col1, h_col2 = st.columns([8, 2])
+    with h_col1:
+        st.markdown("""
+        <div style="display: flex; align-items: baseline; gap: 15px;">
+            <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">Everest Inventory</h1>
+            <p class="subtitle-text" style="margin: 0;">Professional Stock Management System</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with h_col2:
+        if st.button("🔄 Sync Data", help="최신 데이터를 불러오기 위해 화면을 새로고침합니다."):
+            st.rerun()
 
 st.markdown("---")
 
@@ -626,6 +634,23 @@ with tab3:
     with c3:
         log_unit = get_unit_for_item(log_category, log_item)
         st.write(f"Unit: **{log_unit or '-'}**")
+        
+        # --- 실시간 재고 확인 로직 추가 ---
+        inv_data = st.session_state.inventory
+        current_stock_row = inv_data[
+            (inv_data["Branch"] == log_branch) & 
+            (inv_data["Category"] == log_category) & 
+            (inv_data["Item"] == log_item)
+        ]
+        
+        if not current_stock_row.empty:
+            curr_qty = float(current_stock_row.iloc[0]["CurrentQty"])
+        else:
+            curr_qty = 0.0
+            
+        st.metric(label="Current Stock (현재 재고)", value=f"{curr_qty} {log_unit}")
+        # ------------------------------
+
         log_type = st.selectbox("Type", ["IN", "OUT"], key="log_type")
         log_qty = st.number_input("Quantity", min_value=0.0, step=1.0, key="log_qty")
 

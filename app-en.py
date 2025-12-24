@@ -151,10 +151,11 @@ if not st.session_state["splash_shown"]:
 # ================= Ingredient Database (빈 상태로 시작) ==================
 ingredient_list = []
 
-# ================= Files ==================
-DATA_FILE = "inventory_data.csv"          # 재고 스냅샷
-HISTORY_FILE = "stock_history.csv"        # 입출고 로그
-ITEM_FILE = "food ingredients.txt"        # 카테고리/아이템/단위 DB
+# ================= Files (Absolute Paths for Persistence) ==================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
+HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
+ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 카테고리/아이템/단위 DB
 
 # ================= Login Logic ==================
 if "logged_in" not in st.session_state:
@@ -882,10 +883,12 @@ if tab6:
                     except Exception as e:
                         st.error(f"Error parsing pasted text: {e}")
 
+            if "import_success" in st.session_state:
+                st.success(st.session_state.import_success)
+                del st.session_state.import_success
+
             if new_df is not None:
                 try:
-                    st.write("Preview of data to be applied:")
-                    
                     # 컬럼명 정규화 (대소문자 무시, 공백 제거)
                     col_map = {c.lower().strip(): c for c in new_df.columns}
                     
@@ -908,6 +911,7 @@ if tab6:
                         process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
                                                 process_df["Item"].notna() & (process_df["Item"] != "")]
 
+                        st.write("Preview of data to be applied:")
                         st.dataframe(process_df.head(), use_container_width=True)
                         st.write(f"Total {len(process_df)} items found.")
 
@@ -915,7 +919,7 @@ if tab6:
                             with open(ITEM_FILE, "w", encoding="utf-8") as f:
                                 for _, row in process_df.iterrows():
                                     f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
-                            st.success("Successfully updated! Reloading...")
+                            st.session_state.import_success = f"Successfully updated {len(process_df)} items! The database is now permanently saved."
                             st.rerun()
 
                 except Exception as e:
