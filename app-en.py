@@ -1060,6 +1060,14 @@ if tab7:
                 template_buffer.seek(0)
                 st.download_button("⬇ Download Template (.xlsx)", data=template_buffer, file_name="everest_template.xlsx", key="dl_tmpl")
 
+            with st.expander("📥 Download Vendor Template (거래처 양식 다운로드)"):
+                vendor_sample = pd.DataFrame([{"Category": "Vegetable", "Vendor": "Example Mart", "Phone": "010-1234-5678"}])
+                v_buffer = io.BytesIO()
+                with pd.ExcelWriter(v_buffer, engine="openpyxl") as writer:
+                    vendor_sample.to_excel(writer, index=False)
+                v_buffer.seek(0)
+                st.download_button("⬇ Download Vendor Template (.xlsx)", data=v_buffer, file_name="vendor_template.xlsx", key="dl_v_tmpl")
+
             st.markdown("---")
 
             # 3. 재고관리용 데이터 업로드 섹션
@@ -1120,7 +1128,65 @@ if tab7:
                         except: st.error(f"Paste error: {e}")
 
             st.markdown("---")
-            st.markdown("### 3. Emergency Recovery")
+
+            # 5. 거래처(Vendor) 데이터 업로드 섹션
+            st.markdown("### 3. Vendor Mapping (구매처 전화번호 관리)")
+            st.info("카테고리별 구매처와 전화번호를 연결하는 리스트입니다. (필수 컬럼: Category, Vendor, Phone)")
+            
+            def apply_vendor_to_db(df):
+                try:
+                    col_map = {c.lower().strip(): c for c in df.columns}
+                    cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
+                    vendor_col = next((col_map[k] for k in ["vendor", "구매처", "업체"] if k in col_map), None)
+                    phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처"] if k in col_map), None)
+
+                    if not cat_col or not vendor_col or not phone_col:
+                        st.error(f"Missing columns! Requires Category, Vendor, Phone. Found: {list(df.columns)}")
+                        return
+
+                    new_df = pd.DataFrame()
+                    new_df["Category"] = df[cat_col].astype(str).str.strip()
+                    new_df["Vendor"] = df[vendor_col].astype(str).str.strip()
+                    new_df["Phone"] = df[phone_col].astype(str).str.strip()
+                    
+                    new_df = new_df[new_df["Category"].notna() & (new_df["Category"] != "")]
+
+                    st.write("Preview of Vendor Data:")
+                    st.dataframe(new_df.head(), use_container_width=True)
+
+                    if st.button("✅ Apply to Vendor DB", key="apply_vendor"):
+                        new_df.to_csv(VENDOR_FILE, index=False, encoding="utf-8-sig")
+                        st.success("Successfully updated Vendor Mapping!")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error processing vendor data: {e}")
+
+            v_col1, v_col2 = st.columns(2)
+            with v_col1:
+                up_vend = st.file_uploader("Upload Vendor Excel/CSV", type=["xlsx", "csv"], key="up_vend")
+                if up_vend:
+                    try:
+                        if up_vend.name.endswith('.xlsx'):
+                            df_vend = pd.read_excel(up_vend)
+                        else:
+                            df_vend = robust_read_csv(up_vend)
+                        apply_vendor_to_db(df_vend)
+                    except Exception as e: st.error(f"Upload error: {e}")
+            with v_col2:
+                paste_vend = st.text_area("Paste Vendor Data", key="paste_vend", height=100, help="엑셀에서 복사(Category/Vendor/Phone)")
+                if paste_vend:
+                    try:
+                        df_vend_p = pd.read_csv(io.StringIO(paste_vend), sep="\t")
+                        apply_vendor_to_db(df_vend_p)
+                    except Exception as e:
+                         # 탭 실패 시 콤마 시도
+                        try:
+                            df_vend_p = pd.read_csv(io.StringIO(paste_vend))
+                            apply_vendor_to_db(df_vend_p)
+                        except: st.error(f"Paste error: {e}")
+
+            st.markdown("---")
+            st.markdown("### 4. Emergency Recovery")
             if st.button("🚀 Initialize with Default Data", key="init_defaults"):
                 default_df = pd.DataFrame([["Vegetable", "Onion", "kg"]], columns=["Category", "Item", "Unit"])
                 default_df.to_csv(INV_DB, index=False, encoding="utf-8-sig")
