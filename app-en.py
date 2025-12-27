@@ -689,6 +689,13 @@ with tab3:
         if not st.session_state.purchase_cart:
             st.warning("선택된 품목이 없습니다.")
         else:
+            # 전체 삭제 버튼 상단 배치
+            if st.button("🗑 Entire Cart Reset (전체 삭제)", key="clear_all_summary", type="primary", use_container_width=True):
+                st.session_state.purchase_cart = {}
+                st.rerun()
+
+            st.write("---")
+
             # Group by Vendor
             vendor_groups = {}
             for (cat, item), qty in st.session_state.purchase_cart.items():
@@ -696,12 +703,46 @@ with tab3:
                 v_name = v_info["vendor"]
                 if v_name not in vendor_groups:
                     vendor_groups[v_name] = {"phone": v_info["phone"], "items": []}
-                vendor_groups[v_name]["items"].append(f"{item} {qty}{get_unit_for_item(PUR_DB, cat, item)}")
+                vendor_groups[v_name]["items"].append({
+                    "cat": cat,
+                    "item": item,
+                    "qty": qty,
+                    "unit": get_unit_for_item(PUR_DB, cat, item)
+                })
             
             for v_name, data in vendor_groups.items():
                 with st.expander(f"📦 {v_name} ({data['phone']})", expanded=True):
-                    items_str = ", ".join(data["items"])
-                    st.write(f"**품목:** {items_str}")
+                    final_items_list = []
+                    
+                    # 개별 아이템 편집/삭제 UI
+                    for i_idx, item_data in enumerate(data["items"]):
+                        cat, item, qty, unit = item_data["cat"], item_data["item"], item_data["qty"], item_data["unit"]
+                        ikey = (cat, item)
+                        
+                        e_col1, e_col2, e_col3 = st.columns([5, 3, 2])
+                        with e_col1:
+                            st.write(f"**{item}**")
+                        with e_col2:
+                            # 수량 직접 수정
+                            new_val = st.number_input("", min_value=0.0, value=float(qty), step=1.0, 
+                                                     key=f"p_sum_edit_{v_name}_{item}_{i_idx}", label_visibility="collapsed")
+                            if new_val != qty:
+                                if new_val > 0:
+                                    st.session_state.purchase_cart[ikey] = new_val
+                                else:
+                                    del st.session_state.purchase_cart[ikey]
+                                st.rerun()
+                        with e_col3:
+                            # 개별 삭제 버튼
+                            if st.button("❌", key=f"p_del_{v_name}_{item}_{i_idx}"):
+                                del st.session_state.purchase_cart[ikey]
+                                st.rerun()
+                        
+                        final_items_list.append(f"{item} {st.session_state.purchase_cart.get(ikey, qty)}{unit}")
+                    
+                    st.write("---")
+                    items_str = ", ".join(final_items_list)
+                    st.write(f"**Final List:** {items_str}")
                     
                     # SMS Body Construction
                     sms_body = f"[Everest 구매요청]\n{items_str}"
@@ -713,8 +754,6 @@ with tab3:
                     
                     col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
-                        # Streamlit doesn't support direct sms: links in buttons easily, 
-                        # so we use markdown link styled as a button
                         st.markdown(f'''
                             <a href="{sms_link}" target="_blank" style="
                                 text-decoration: none;
