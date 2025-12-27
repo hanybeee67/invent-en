@@ -386,15 +386,24 @@ def load_vendor_mapping():
             # 컬럼명 정규화
             col_map = {c.lower().strip(): c for c in df.columns}
             cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
-            vendor_col = next((col_map[k] for k in ["vendor", "구매처", "업체"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
-            phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
+            item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None) # Item 컬럼 추가
+            vendor_col = next((col_map[k] for k in ["vendor", "구매처", "업체"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
+            phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처"] if k in col_map), df.columns[3] if len(df.columns) > 3 else None)
             
             for _, row in df.iterrows():
                 cat = str(row[cat_col]).strip()
+                item = str(row[item_col]).strip() if item_col else "" # Item 값 읽기
                 vendor = str(row[vendor_col]).strip() if vendor_col else ""
                 phone = str(row[phone_col]).strip() if phone_col else ""
-                if cat:
-                    mapping[cat] = {"vendor": vendor, "phone": phone}
+                
+                # 키를 (Category, Item)으로 변경. Item이 없으면 포괄적인 Category 룰로 쓸 수도 있겠으나,
+                # 사용자 요청은 아이템별 매핑이므로 (cat, item)을 키로 잡음.
+                if cat and item:
+                    mapping[(cat, item)] = {"vendor": vendor, "phone": phone}
+                elif cat and not item: 
+                     # 혹시 Item 없이 카테고리만 있는 경우 'ALL' 키(또는 빈 문자열)로 처리하여 fallback 가능하게?
+                     # 일단 명확성을 위해 (cat, "") 키로 저장
+                     mapping[(cat, "")] = {"vendor": vendor, "phone": phone}
         except Exception as e:
             st.error(f"Error parsing vendors: {e}")
     return mapping
@@ -747,7 +756,17 @@ with tab3:
             # Group by Vendor
             vendor_groups = {}
             for (cat, item), qty in active_cart.items():
-                v_info = vendor_map.get(cat, {"vendor": "미지정", "phone": ""})
+                # 1. (Category, Item)으로 직접 찾기
+                v_info = vendor_map.get((cat, item))
+                
+                # 2. 없으면 (Category, "") 로 찾기 (Category 전체 매핑)
+                if not v_info:
+                    v_info = vendor_map.get((cat, ""))
+                
+                # 3. 그래도 없으면 미지정
+                if not v_info:
+                    v_info = {"vendor": "미지정 (Unknown)", "phone": ""}
+                
                 v_name = v_info["vendor"]
                 if v_name not in vendor_groups:
                     vendor_groups[v_name] = {"phone": v_info["phone"], "items": []}
@@ -1061,7 +1080,7 @@ if tab7:
                 st.download_button("⬇ Download Template (.xlsx)", data=template_buffer, file_name="everest_template.xlsx", key="dl_tmpl")
 
             with st.expander("📥 Download Vendor Template (거래처 양식 다운로드)"):
-                vendor_sample = pd.DataFrame([{"Category": "Vegetable", "Vendor": "Example Mart", "Phone": "010-1234-5678"}])
+                vendor_sample = pd.DataFrame([{"Category": "Vegetable", "Item": "Onion", "Vendor": "Example Mart", "Phone": "010-1234-5678"}])
                 v_buffer = io.BytesIO()
                 with pd.ExcelWriter(v_buffer, engine="openpyxl") as writer:
                     vendor_sample.to_excel(writer, index=False)
@@ -1131,25 +1150,27 @@ if tab7:
 
             # 5. 거래처(Vendor) 데이터 업로드 섹션
             st.markdown("### 3. Vendor Mapping (구매처 전화번호 관리)")
-            st.info("카테고리별 구매처와 전화번호를 연결하는 리스트입니다. (필수 컬럼: Category, Vendor, Phone)")
+            st.info("각 품목(Item)별 구매처와 전화번호를 관리하는 리스트입니다. (필수: Category, Item, Vendor, Phone)")
             
             def apply_vendor_to_db(df):
                 try:
                     col_map = {c.lower().strip(): c for c in df.columns}
                     cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
+                    item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
                     vendor_col = next((col_map[k] for k in ["vendor", "구매처", "업체"] if k in col_map), None)
                     phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처"] if k in col_map), None)
 
-                    if not cat_col or not vendor_col or not phone_col:
-                        st.error(f"Missing columns! Requires Category, Vendor, Phone. Found: {list(df.columns)}")
+                    if not item_col or not vendor_col:
+                        st.error(f"Missing columns! Requires Item, Vendor, Phone. Found: {list(df.columns)}")
                         return
 
                     new_df = pd.DataFrame()
-                    new_df["Category"] = df[cat_col].astype(str).str.strip()
+                    new_df["Category"] = df[cat_col].astype(str).str.strip() if cat_col else ""
+                    new_df["Item"] = df[item_col].astype(str).str.strip()
                     new_df["Vendor"] = df[vendor_col].astype(str).str.strip()
-                    new_df["Phone"] = df[phone_col].astype(str).str.strip()
+                    new_df["Phone"] = df[phone_col].astype(str).str.strip() if phone_col else ""
                     
-                    new_df = new_df[new_df["Category"].notna() & (new_df["Category"] != "")]
+                    new_df = new_df[new_df["Item"].notna() & (new_df["Item"] != "")]
 
                     st.write("Preview of Vendor Data:")
                     st.dataframe(new_df.head(), use_container_width=True)
