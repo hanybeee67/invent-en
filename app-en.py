@@ -326,64 +326,77 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
+def robust_read_csv(file_path, **kwargs):
+    """
+    다양한 인코딩 및 형식을 지원하는 강건한 CSV 읽기 함수.
+    """
+    if not os.path.exists(file_path):
+        return pd.DataFrame()
+        
+    encodings = ['utf-8-sig', 'utf-16', 'cp949', 'latin-1']
+    for enc in encodings:
+        try:
+            # sep=None, engine='python'은 구분자 자동 감지를 위해 사용
+            df = pd.read_csv(file_path, sep=None, engine='python', encoding=enc, **kwargs)
+            return df
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+        except Exception:
+            # 인코딩 외의 에러(예: 빈 파일)일 경우 다음으로 넘어가거나 빈 DF 반환
+            continue
+            
+    # 모든 인코딩 실패 시 최후의 방법 (바이트 무시)
+    try:
+        return pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8', errors='ignore', **kwargs)
+    except:
+        return pd.DataFrame()
+
 def load_item_db(file_path):
     """
-    엑셀/CSV 형식의 아이템 DB 로드 함수.
-    UTF-8-SIG(BOM) 및 다양한 인코딩에 대응하도록 보완.
+    아이템 DB 로드 (robust_read_csv 사용)
     """
     items = []
-    if os.path.exists(file_path):
-        try:
-            # 1. pandas로 시도 (encoding='utf-8-sig'로 BOM 대응)
-            try:
-                df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8-sig')
-                col_map = {c.lower().strip(): c for c in df.columns}
-                cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
-                item_col = next((col_map[k] for k in ["item", "아이템", "품목"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
-                unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
-                
-                for _, row in df.iterrows():
-                    cat = str(row[cat_col]).strip() if cat_col and cat_col in df.columns else ""
-                    name = str(row[item_col]).strip() if item_col and item_col in df.columns else ""
-                    unit = str(row[unit_col]).strip() if unit_col and unit_col in df.columns else ""
-                    if cat and name and cat.lower() != "category": # 헤더 중복 방지
-                        items.append({"category": cat, "item": name, "unit": unit})
-            except Exception as e:
-                # 2. 실패 시 다른 인코딩 시도 (PowerShell echo 등 대응용)
-                try:
-                    df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-16')
-                    # 위와 동일 로직 적용... (코드 간소화를 위해 별도 분리하지 않음)
-                    col_map = {c.lower().strip(): c for c in df.columns}
-                    cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
-                    item_col = next((col_map[k] for k in ["item", "아이템", "품목"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
-                    unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
-                    for _, row in df.iterrows():
-                        cat = str(row[cat_col]).strip() if cat_col in df.columns else ""
-                        name = str(row[item_col]).strip() if item_col and item_col in df.columns else ""
-                        unit = str(row[unit_col]).strip() if unit_col and unit_col in df.columns else ""
-                        if cat and name and cat.lower() != "category":
-                            items.append({"category": cat, "item": name, "unit": unit})
-                except:
-                    # 3. 최후의 보루: 수동 파싱 (errors='ignore'로 비정상 바이트 무시)
-                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                        for line in f:
-                            if not line.strip(): continue
-                            parts = [p.strip() for p in line.replace(",", "\t").split("\t")]
-                            if len(parts) >= 2 and parts[0].lower() != "category":
-                                items.append({"category": parts[0], "item": parts[1], "unit": parts[2] if len(parts) >= 3 else ""})
-        except Exception as e:
-            st.error(f"Error reading {file_path}: {e}")
+    df = robust_read_csv(file_path)
+    
+    if df.empty or len(df.columns) < 2:
+        return items
+        
+    try:
+        col_map = {c.lower().strip(): c for c in df.columns}
+        cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), df.columns[0])
+        item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
+        unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
+        
+        for _, row in df.iterrows():
+            cat = str(row[cat_col]).strip() if cat_col and cat_col in df.columns else ""
+            name = str(row[item_col]).strip() if item_col and item_col in df.columns else ""
+            unit = str(row[unit_col]).strip() if unit_col and unit_col in df.columns else ""
+            if cat and name and cat.lower() not in ["category", "카테고리"]:
+                items.append({"category": cat, "item": name, "unit": unit})
+    except Exception as e:
+        st.error(f"Error parsing items in {file_path}: {e}")
+        
     return items
 
 def load_vendor_mapping():
     mapping = {}
-    if os.path.exists(VENDOR_FILE):
+    df = robust_read_csv(VENDOR_FILE)
+    if not df.empty:
         try:
-            df = pd.read_csv(VENDOR_FILE)
+            # 컬럼명 정규화
+            col_map = {c.lower().strip(): c for c in df.columns}
+            cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
+            vendor_col = next((col_map[k] for k in ["vendor", "구매처", "업체"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
+            phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
+            
             for _, row in df.iterrows():
-                mapping[row['Category']] = {"vendor": row['Vendor'], "phone": row['Phone']}
+                cat = str(row[cat_col]).strip()
+                vendor = str(row[vendor_col]).strip() if vendor_col else ""
+                phone = str(row[phone_col]).strip() if phone_col else ""
+                if cat:
+                    mapping[cat] = {"vendor": vendor, "phone": phone}
         except Exception as e:
-            st.error(f"Error reading {VENDOR_FILE}: {e}")
+            st.error(f"Error parsing vendors: {e}")
     return mapping
 
 def get_all_categories(file_path):
@@ -407,29 +420,30 @@ def get_unit_for_item(file_path, category, item):
 
 # ================= Data Load / Save ==================
 def load_inventory():
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE)
-        expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
-        for col in expected:
-            if col not in df.columns:
-                df[col] = ""
-        return df[expected]
-    else:
-        return pd.DataFrame(columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"])
+    df = robust_read_csv(DATA_FILE)
+    expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+    if df.empty:
+        return pd.DataFrame(columns=expected)
+    
+    # 필요한 컬럼 보장
+    for col in expected:
+        if col not in df.columns:
+            df[col] = ""
+    return df[expected]
 
 def save_inventory(df):
     df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
 
 def load_history():
-    if os.path.exists(HISTORY_FILE):
-        df = pd.read_csv(HISTORY_FILE)
-        expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
-        for col in expected:
-            if col not in df.columns:
-                df[col] = ""
-        return df[expected]
-    else:
-        return pd.DataFrame(columns=["Date","Branch","Category","Item","Unit","Type","Qty"])
+    df = robust_read_csv(HISTORY_FILE)
+    expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
+    if df.empty:
+        return pd.DataFrame(columns=expected)
+        
+    for col in expected:
+        if col not in df.columns:
+            df[col] = ""
+    return df[expected]
 
 def save_history(df):
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
