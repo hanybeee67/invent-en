@@ -672,30 +672,42 @@ with tab3:
             
         for idx, item_info in enumerate(filtered_items):
             ikey = (item_info["category"], item_info["item"])
-            default_val = st.session_state.purchase_cart.get(ikey, 0.0)
-            
-            # Use columns for compact row
+            # 세션 상태에서 안전하게 값을 가져오고, 없으면 0.0으로 초기화
+            if ikey not in st.session_state.purchase_cart:
+                st.session_state.purchase_cart[ikey] = 0.0
+
             r_col1, r_col2 = st.columns([7, 3])
             with r_col1:
                 st.write(f"**{item_info['item']}** ({item_info['unit']})")
             with r_col2:
-                new_qty = st.number_input("", min_value=0.0, value=float(default_val), step=1.0, key=f"p_input_{p_cat}_{idx}", label_visibility="collapsed")
-                if new_qty > 0:
-                    st.session_state.purchase_cart[ikey] = new_qty
-                elif ikey in st.session_state.purchase_cart:
-                    del st.session_state.purchase_cart[ikey]
+                # onChange를 사용하여 값이 바뀌는 즉시 세션 상태 업데이트 및 반영
+                def update_cart(k=ikey, idx_val=idx):
+                    val = st.session_state[f"p_input_{p_cat}_{idx_val}"]
+                    if val > 0:
+                        st.session_state.purchase_cart[k] = val
+                    else:
+                        if k in st.session_state.purchase_cart:
+                            del st.session_state.purchase_cart[k]
 
-        if st.button("🗑 Reset Cart", key="reset_cart"):
+                st.number_input("", min_value=0.0, step=1.0, 
+                                key=f"p_input_{p_cat}_{idx}", 
+                                value=float(st.session_state.purchase_cart.get(ikey, 0.0)),
+                                on_change=update_cart,
+                                label_visibility="collapsed")
+
+        if st.button("🗑 Reset Cart", key="reset_cart", use_container_width=True):
             st.session_state.purchase_cart = {}
             st.rerun()
 
     with p_col2:
         st.markdown("### 2. Purchase Summary & SMS")
-        if not st.session_state.purchase_cart:
+        # 실제 값이 담긴 항목만 필터링 (0보다 큰 것)
+        active_cart = {k: v for k, v in st.session_state.purchase_cart.items() if v > 0}
+        
+        if not active_cart:
             st.warning("선택된 품목이 없습니다.")
         else:
-            # 전체 삭제 버튼 상단 배치
-            if st.button("🗑 Entire Cart Reset (전체 삭제)", key="clear_all_summary", type="primary", use_container_width=True):
+            if st.button("🗑 Clear All (전체 삭제)", key="clear_all_summary", type="primary", use_container_width=True):
                 st.session_state.purchase_cart = {}
                 st.rerun()
 
@@ -703,7 +715,7 @@ with tab3:
 
             # Group by Vendor
             vendor_groups = {}
-            for (cat, item), qty in st.session_state.purchase_cart.items():
+            for (cat, item), qty in active_cart.items():
                 v_info = vendor_map.get(cat, {"vendor": "미지정", "phone": ""})
                 v_name = v_info["vendor"]
                 if v_name not in vendor_groups:
@@ -719,40 +731,27 @@ with tab3:
                 with st.expander(f"📦 {v_name} ({data['phone']})", expanded=True):
                     final_items_list = []
                     
-                    # 개별 아이템 편집/삭제 UI
                     for i_idx, item_data in enumerate(data["items"]):
                         cat, item, qty, unit = item_data["cat"], item_data["item"], item_data["qty"], item_data["unit"]
                         ikey = (cat, item)
                         
-                        e_col1, e_col2, e_col3 = st.columns([5, 3, 2])
+                        e_col1, e_col2 = st.columns([8, 2])
                         with e_col1:
-                            st.write(f"**{item}**")
+                            st.write(f"• **{item}**: {qty} {unit}")
                         with e_col2:
-                            # 수량 직접 수정
-                            new_val = st.number_input("", min_value=0.0, value=float(qty), step=1.0, 
-                                                     key=f"p_sum_edit_{v_name}_{item}_{i_idx}", label_visibility="collapsed")
-                            if new_val != qty:
-                                if new_val > 0:
-                                    st.session_state.purchase_cart[ikey] = new_val
-                                else:
+                            # 요약 섹션에서의 삭제 버튼
+                            if st.button("❌", key=f"p_del_{v_name}_{item}_{i_idx}"):
+                                if ikey in st.session_state.purchase_cart:
                                     del st.session_state.purchase_cart[ikey]
                                 st.rerun()
-                        with e_col3:
-                            # 개별 삭제 버튼
-                            if st.button("❌", key=f"p_del_{v_name}_{item}_{i_idx}"):
-                                del st.session_state.purchase_cart[ikey]
-                                st.rerun()
                         
-                        final_items_list.append(f"{item} {st.session_state.purchase_cart.get(ikey, qty)}{unit}")
+                        final_items_list.append(f"{item} {qty}{unit}")
                     
                     st.write("---")
                     items_str = ", ".join(final_items_list)
-                    st.write(f"**Final List:** {items_str}")
                     
                     # SMS Body Construction
                     sms_body = f"[Everest 구매요청]\n{items_str}"
-                    
-                    # URL Encoding for SMS
                     import urllib.parse
                     encoded_body = urllib.parse.quote(sms_body)
                     sms_link = f"sms:{data['phone']}?body={encoded_body}"
@@ -761,21 +760,16 @@ with tab3:
                     with col_btn1:
                         st.markdown(f'''
                             <a href="{sms_link}" target="_blank" style="
-                                text-decoration: none;
-                                color: white;
+                                text-decoration: none; color: white;
                                 background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-                                padding: 10px 20px;
-                                border-radius: 8px;
-                                display: inline-block;
-                                font-weight: 600;
-                                width: 100%;
-                                text-align: center;
+                                padding: 10px 20px; border-radius: 8px;
+                                display: inline-block; font-weight: 600; width: 100%; text-align: center;
                             ">📲 Send SMS (문자발송)</a>
                         ''', unsafe_allow_html=True)
                     with col_btn2:
                         if st.button(f"📋 Copy Message", key=f"copy_{v_name}"):
                             st.code(sms_body)
-                            st.success("위 텍스트를 복사하여 사용하세요!")
+                            st.success("복사 완료!")
 
 # ======================================================
 # TAB 4: IN/OUT Log (All)
