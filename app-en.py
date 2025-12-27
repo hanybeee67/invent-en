@@ -329,35 +329,48 @@ html, body, [class*="css"] {
 def load_item_db(file_path):
     """
     엑셀/CSV 형식의 아이템 DB 로드 함수.
-    이전 텍스트 형식(TAB 구분)과 CSV 형식을 모두 지원하도록 함.
+    UTF-8-SIG(BOM) 및 다양한 인코딩에 대응하도록 보완.
     """
     items = []
     if os.path.exists(file_path):
         try:
-            # 1. 먼저 pandas로 시도 (CSV 호환)
+            # 1. pandas로 시도 (encoding='utf-8-sig'로 BOM 대응)
             try:
-                # 엑셀 복사-붙여넣기나 탭 구분 파일일 수 있으므로 sep=None으로 자동 감지 시도하거나 순차 시도
-                df = pd.read_csv(file_path, sep=None, engine='python')
-                # 컬럼명 정규화
+                df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8-sig')
                 col_map = {c.lower().strip(): c for c in df.columns}
                 cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
                 item_col = next((col_map[k] for k in ["item", "아이템", "품목"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
                 unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
                 
                 for _, row in df.iterrows():
-                    cat = str(row[cat_col]).strip() if cat_col in df.columns else ""
+                    cat = str(row[cat_col]).strip() if cat_col and cat_col in df.columns else ""
                     name = str(row[item_col]).strip() if item_col and item_col in df.columns else ""
                     unit = str(row[unit_col]).strip() if unit_col and unit_col in df.columns else ""
-                    if cat and name:
+                    if cat and name and cat.lower() != "category": # 헤더 중복 방지
                         items.append({"category": cat, "item": name, "unit": unit})
-            except:
-                # 2. 실패 시 수동 파싱 (기존 방식 보완)
-                with open(file_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if not line.strip(): continue
-                        parts = [p.strip() for p in line.replace(",", "\t").split("\t")]
-                        if len(parts) >= 2:
-                            items.append({"category": parts[0], "item": parts[1], "unit": parts[2] if len(parts) >= 3 else ""})
+            except Exception as e:
+                # 2. 실패 시 다른 인코딩 시도 (PowerShell echo 등 대응용)
+                try:
+                    df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-16')
+                    # 위와 동일 로직 적용... (코드 간소화를 위해 별도 분리하지 않음)
+                    col_map = {c.lower().strip(): c for c in df.columns}
+                    cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
+                    item_col = next((col_map[k] for k in ["item", "아이템", "품목"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
+                    unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
+                    for _, row in df.iterrows():
+                        cat = str(row[cat_col]).strip() if cat_col in df.columns else ""
+                        name = str(row[item_col]).strip() if item_col and item_col in df.columns else ""
+                        unit = str(row[unit_col]).strip() if unit_col and unit_col in df.columns else ""
+                        if cat and name and cat.lower() != "category":
+                            items.append({"category": cat, "item": name, "unit": unit})
+                except:
+                    # 3. 최후의 보루: 수동 파싱 (errors='ignore'로 비정상 바이트 무시)
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        for line in f:
+                            if not line.strip(): continue
+                            parts = [p.strip() for p in line.replace(",", "\t").split("\t")]
+                            if len(parts) >= 2 and parts[0].lower() != "category":
+                                items.append({"category": parts[0], "item": parts[1], "unit": parts[2] if len(parts) >= 3 else ""})
         except Exception as e:
             st.error(f"Error reading {file_path}: {e}")
     return items
