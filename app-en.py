@@ -672,30 +672,34 @@ with tab3:
             
         for idx, item_info in enumerate(filtered_items):
             ikey = (item_info["category"], item_info["item"])
-            # 세션 상태에서 안전하게 값을 가져오고, 없으면 0.0으로 초기화
-            if ikey not in st.session_state.purchase_cart:
-                st.session_state.purchase_cart[ikey] = 0.0
-
-            r_col1, r_col2 = st.columns([7, 3])
+            
+            # 행(Row) 구성: 품목명 | 수량입력 | Done버튼
+            r_col1, r_col2, r_col3 = st.columns([5, 3, 2])
+            
             with r_col1:
                 st.write(f"**{item_info['item']}** ({item_info['unit']})")
+            
             with r_col2:
-                # onChange를 사용하여 값이 바뀌는 즉시 세션 상태 업데이트 및 반영
-                def update_cart(k=ikey, idx_val=idx):
-                    val = st.session_state[f"p_input_{p_cat}_{idx_val}"]
-                    if val > 0:
-                        st.session_state.purchase_cart[k] = val
+                # 현재 장바구니에 담긴 값이 있다면 기본값으로 보여줌
+                current_val = st.session_state.purchase_cart.get(ikey, 0.0)
+                temp_qty = st.number_input("", min_value=0.0, step=1.0, 
+                                          value=float(current_val),
+                                          key=f"p_input_{p_cat}_{idx}", 
+                                          label_visibility="collapsed")
+            
+            with r_col3:
+                # Done 버튼 클릭 시에만 장바구니(purchase_cart)에 저장
+                if st.button("Done", key=f"done_btn_{p_cat}_{idx}", use_container_width=True):
+                    if temp_qty > 0:
+                        st.session_state.purchase_cart[ikey] = temp_qty
+                        st.toast(f"✅ {item_info['item']} added!")
                     else:
-                        if k in st.session_state.purchase_cart:
-                            del st.session_state.purchase_cart[k]
+                        if ikey in st.session_state.purchase_cart:
+                            del st.session_state.purchase_cart[ikey]
+                    st.rerun()
 
-                st.number_input("", min_value=0.0, step=1.0, 
-                                key=f"p_input_{p_cat}_{idx}", 
-                                value=float(st.session_state.purchase_cart.get(ikey, 0.0)),
-                                on_change=update_cart,
-                                label_visibility="collapsed")
-
-        if st.button("🗑 Reset Cart", key="reset_cart", use_container_width=True):
+        st.write("---")
+        if st.button("🗑 Reset All", key="reset_cart", use_container_width=True):
             st.session_state.purchase_cart = {}
             st.rerun()
 
