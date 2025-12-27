@@ -156,6 +156,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
 HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
 ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 카테고리/아이템/단위 DB
+VENDOR_FILE = os.path.join(BASE_DIR, "vendor_mapping.csv")      # 구매처 매핑 DB
 
 # ================= Login Logic ==================
 if "logged_in" not in st.session_state:
@@ -345,6 +346,24 @@ def load_item_db():
     
     return items
 
+def load_vendor_mapping():
+    """
+    vendor_mapping.csv에서 구매처 정보를 읽어옴
+    컬럼: Category, Vendor, Phone
+    """
+    mapping = {}
+    if os.path.exists(VENDOR_FILE):
+        try:
+            df = pd.read_csv(VENDOR_FILE)
+            for _, row in df.iterrows():
+                mapping[row['Category']] = {
+                    "vendor": row['Vendor'],
+                    "phone": row['Phone']
+                }
+        except Exception as e:
+            st.error(f"Error reading {VENDOR_FILE}: {e}")
+    return mapping
+
 def get_all_categories():
     db = load_item_db()
     return sorted(set([i["category"] for i in db]))
@@ -445,9 +464,10 @@ if not st.session_state.inventory.empty:
 # ================= Tabs ==================
 
 # ================= Tabs ==================
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "✏ Register / Edit",
     "📊 View / Print",
+    "🛒 Purchase",
     "📦 IN / OUT Log",
     "📈 Usage Analysis",
     "📄 Monthly Report",
@@ -617,9 +637,102 @@ with tab2:
     )
 
 # ======================================================
-# TAB 3: IN/OUT Log (All)
+# TAB 3: Purchase (구매) (All)
 # ======================================================
 with tab3:
+    st.subheader("🛒 Item Purchase (품목 구매)")
+    st.info("구매할 품목의 수량을 입력하면 구매처별로 정리하여 문자를 보낼 수 있습니다.")
+    
+    vendor_map = load_vendor_mapping()
+    all_items = load_item_db()
+    
+    if "purchase_cart" not in st.session_state:
+        st.session_state.purchase_cart = {} # {(category, item): qty}
+        
+    p_col1, p_col2 = st.columns([4, 6])
+    
+    with p_col1:
+        st.markdown("### 1. Select Items")
+        p_cat = st.selectbox("Category", ["All"] + get_all_categories(), key="p_cat")
+        
+        filtered_items = []
+        if p_cat == "All":
+            filtered_items = all_items
+        else:
+            filtered_items = [i for i in all_items if i["category"] == p_cat]
+            
+        for idx, item_info in enumerate(filtered_items):
+            ikey = (item_info["category"], item_info["item"])
+            default_val = st.session_state.purchase_cart.get(ikey, 0.0)
+            
+            # Use columns for compact row
+            r_col1, r_col2 = st.columns([7, 3])
+            with r_col1:
+                st.write(f"**{item_info['item']}** ({item_info['unit']})")
+            with r_col2:
+                new_qty = st.number_input("", min_value=0.0, value=float(default_val), step=1.0, key=f"p_input_{p_cat}_{idx}", label_visibility="collapsed")
+                if new_qty > 0:
+                    st.session_state.purchase_cart[ikey] = new_qty
+                elif ikey in st.session_state.purchase_cart:
+                    del st.session_state.purchase_cart[ikey]
+
+        if st.button("🗑 Reset Cart", key="reset_cart"):
+            st.session_state.purchase_cart = {}
+            st.rerun()
+
+    with p_col2:
+        st.markdown("### 2. Purchase Summary & SMS")
+        if not st.session_state.purchase_cart:
+            st.warning("선택된 품목이 없습니다.")
+        else:
+            # Group by Vendor
+            vendor_groups = {}
+            for (cat, item), qty in st.session_state.purchase_cart.items():
+                v_info = vendor_map.get(cat, {"vendor": "미지정", "phone": ""})
+                v_name = v_info["vendor"]
+                if v_name not in vendor_groups:
+                    vendor_groups[v_name] = {"phone": v_info["phone"], "items": []}
+                vendor_groups[v_name]["items"].append(f"{item} {qty}{get_unit_for_item(cat, item)}")
+            
+            for v_name, data in vendor_groups.items():
+                with st.expander(f"📦 {v_name} ({data['phone']})", expanded=True):
+                    items_str = ", ".join(data["items"])
+                    st.write(f"**품목:** {items_str}")
+                    
+                    # SMS Body Construction
+                    sms_body = f"[Everest 구매요청]\n{items_str}"
+                    
+                    # URL Encoding for SMS
+                    import urllib.parse
+                    encoded_body = urllib.parse.quote(sms_body)
+                    sms_link = f"sms:{data['phone']}?body={encoded_body}"
+                    
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        # Streamlit doesn't support direct sms: links in buttons easily, 
+                        # so we use markdown link styled as a button
+                        st.markdown(f'''
+                            <a href="{sms_link}" target="_blank" style="
+                                text-decoration: none;
+                                color: white;
+                                background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+                                padding: 10px 20px;
+                                border-radius: 8px;
+                                display: inline-block;
+                                font-weight: 600;
+                                width: 100%;
+                                text-align: center;
+                            ">📲 Send SMS (문자발송)</a>
+                        ''', unsafe_allow_html=True)
+                    with col_btn2:
+                        if st.button(f"📋 Copy Message", key=f"copy_{v_name}"):
+                            st.code(sms_body)
+                            st.success("위 텍스트를 복사하여 사용하세요!")
+
+# ======================================================
+# TAB 4: IN/OUT Log (All)
+# ======================================================
+with tab4:
     st.subheader("Stock IN / OUT Log (Auto Update Inventory)")
     
     c1, c2, c3 = st.columns(3)
@@ -694,10 +807,10 @@ with tab3:
 # ======================================================
 # TAB 4: Usage Analysis (All)
 # ======================================================
-with tab4:
+with tab5:
     st.subheader("Usage Analysis (by Branch / Category / Item)")
     
-    if check_login("tab4"):
+    if check_login("tab5"):
         history_df = st.session_state.history.copy()
         if history_df.empty:
             st.info("No history data yet.")
@@ -743,11 +856,11 @@ with tab4:
 # ======================================================
 # TAB 5: Monthly Report (Manager Only)
 # ======================================================
-if tab5:
-    with tab5:
+if tab6:
+    with tab6:
         st.subheader("📄 Monthly Stock Report (Excel + PDF)")
         
-        if check_login("tab5"):
+        if check_login("tab6"):
             rep_year = st.number_input("Year", min_value=2020, max_value=2100, value=datetime.now().year, step=1, key="rep_year")
             rep_month = st.number_input("Month", min_value=1, max_value=12, value=datetime.now().month, step=1, key="rep_month")
 
@@ -827,11 +940,11 @@ if tab5:
 # ======================================================
 # TAB 6: Data Management (Bulk Import) (Manager Only)
 # ======================================================
-if tab6:
-    with tab6:
+if tab7:
+    with tab7:
         st.subheader("💾 Data Management / Settings")
         
-        if check_login("tab6"):
+        if check_login("tab7"):
             st.markdown("### 1. Bulk Import Ingredients")
             st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
 
@@ -939,7 +1052,7 @@ if tab6:
 # ======================================================
 # TAB 7: Help Manual (All)
 # ======================================================
-with tab7:
+with tab8:
     st.header("🏔 Everest Inventory System - Help Manual")
     st.subheader("एभरेस्ट इन्भेन्टरी व्यवस्थापन प्रणाली - प्रयोगकर्ता पुस्तिका")
     
