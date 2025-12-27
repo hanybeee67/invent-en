@@ -155,7 +155,9 @@ ingredient_list = []
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
 HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
-ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 카테고리/아이템/단위 DB
+ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 원본 (백업용)
+INV_DB = os.path.join(BASE_DIR, "inventory_db.csv")             # 재고용 DB
+PUR_DB = os.path.join(BASE_DIR, "purchase_db.csv")              # 구매용 DB
 VENDOR_FILE = os.path.join(BASE_DIR, "vendor_mapping.csv")      # 구매처 매핑 DB
 
 # ================= Login Logic ==================
@@ -319,65 +321,67 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ================= Load item DB from file ==================
-def load_item_db():
+def load_item_db(file_path):
     """
-    food ingredients.txt 형식:
-    Category<TAB>Item<TAB>Unit
-    
-    기본 ingredient_list와 파일 내용을 병합하여 반환함.
+    엑셀/CSV 형식의 아이템 DB 로드 함수.
+    이전 텍스트 형식(TAB 구분)과 CSV 형식을 모두 지원하도록 함.
     """
     items = []
-    
-    # 1. 파일 로드
-    if os.path.exists(ITEM_FILE):
+    if os.path.exists(file_path):
         try:
-            with open(ITEM_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip(): continue
-                    parts = [p.strip() for p in line.split("\t")]
-                    if len(parts) >= 2:
-                        cat = parts[0]
-                        item = parts[1]
-                        unit = parts[2] if len(parts) >= 3 else ""
-                        items.append({"category": cat, "item": item, "unit": unit})
+            # 1. 먼저 pandas로 시도 (CSV 호환)
+            try:
+                # 엑셀 복사-붙여넣기나 탭 구분 파일일 수 있으므로 sep=None으로 자동 감지 시도하거나 순차 시도
+                df = pd.read_csv(file_path, sep=None, engine='python')
+                # 컬럼명 정규화
+                col_map = {c.lower().strip(): c for c in df.columns}
+                cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
+                item_col = next((col_map[k] for k in ["item", "아이템", "품목"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
+                unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
+                
+                for _, row in df.iterrows():
+                    cat = str(row[cat_col]).strip() if cat_col in df.columns else ""
+                    name = str(row[item_col]).strip() if item_col and item_col in df.columns else ""
+                    unit = str(row[unit_col]).strip() if unit_col and unit_col in df.columns else ""
+                    if cat and name:
+                        items.append({"category": cat, "item": name, "unit": unit})
+            except:
+                # 2. 실패 시 수동 파싱 (기존 방식 보완)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip(): continue
+                        parts = [p.strip() for p in line.replace(",", "\t").split("\t")]
+                        if len(parts) >= 2:
+                            items.append({"category": parts[0], "item": parts[1], "unit": parts[2] if len(parts) >= 3 else ""})
         except Exception as e:
-            st.error(f"Error reading {ITEM_FILE}: {e}")
-    
+            st.error(f"Error reading {file_path}: {e}")
     return items
 
 def load_vendor_mapping():
-    """
-    vendor_mapping.csv에서 구매처 정보를 읽어옴
-    컬럼: Category, Vendor, Phone
-    """
     mapping = {}
     if os.path.exists(VENDOR_FILE):
         try:
             df = pd.read_csv(VENDOR_FILE)
             for _, row in df.iterrows():
-                mapping[row['Category']] = {
-                    "vendor": row['Vendor'],
-                    "phone": row['Phone']
-                }
+                mapping[row['Category']] = {"vendor": row['Vendor'], "phone": row['Phone']}
         except Exception as e:
             st.error(f"Error reading {VENDOR_FILE}: {e}")
     return mapping
 
-def get_all_categories():
-    db = load_item_db()
+def get_all_categories(file_path):
+    db = load_item_db(file_path)
     return sorted(set([i["category"] for i in db]))
 
-def get_all_units():
-    db = load_item_db()
+def get_all_units(file_path):
+    db = load_item_db(file_path)
     return sorted(set([i["unit"] for i in db if i["unit"]]))
 
-def get_items_by_category(category):
-    db = load_item_db()
+def get_items_by_category(file_path, category):
+    db = load_item_db(file_path)
     return sorted([i["item"] for i in db if i["category"] == category])
 
-def get_unit_for_item(category, item):
-    db = load_item_db()
+def get_unit_for_item(file_path, category, item):
+    db = load_item_db(file_path)
     for i in db:
         if i["category"] == category and i["item"] == item:
             return i["unit"]
@@ -489,20 +493,20 @@ if tab1:
         
         with col1:
             branch = st.selectbox("Branch", branches, key="branch")
-            category = st.selectbox("Category", get_all_categories(), key="category")
+            category = st.selectbox("Category", get_all_categories(INV_DB), key="category")
         
         with col2:
             input_type = st.radio("Item Input", ["Select from list", "Type manually"], key="input_type")
             if input_type == "Select from list":
-                items = get_items_by_category(category)
+                items = get_items_by_category(INV_DB, category)
                 item = st.selectbox("Item name", items, key="item_name")
             else:
                 item = st.text_input("Item name", key="item_name_manual")
 
             # ---- Unit 자동 세팅 + 선택 가능 ----
-            auto_unit = get_unit_for_item(category, item) if input_type == "Select from list" else ""
+            auto_unit = get_unit_for_item(INV_DB, category, item) if input_type == "Select from list" else ""
             # unit_options = ["", "kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]  # Old hardcoded
-            unit_options = [""] + get_all_units()  # Dynamic from DB
+            unit_options = [""] + get_all_units(INV_DB)  # Dynamic from DB
             
             # 아이템이 변경되었는지 확인하여 unit_select 강제 업데이트
             current_item_key = f"last_item_{category}_{item}"
@@ -644,7 +648,7 @@ with tab3:
     st.info("구매할 품목의 수량을 입력하면 구매처별로 정리하여 문자를 보낼 수 있습니다.")
     
     vendor_map = load_vendor_mapping()
-    all_items = load_item_db()
+    all_items = load_item_db(PUR_DB)
     
     if "purchase_cart" not in st.session_state:
         st.session_state.purchase_cart = {} # {(category, item): qty}
@@ -653,7 +657,7 @@ with tab3:
     
     with p_col1:
         st.markdown("### 1. Select Items")
-        p_cat = st.selectbox("Category", ["All"] + get_all_categories(), key="p_cat")
+        p_cat = st.selectbox("Category", ["All"] + get_all_categories(PUR_DB), key="p_cat")
         
         filtered_items = []
         if p_cat == "All":
@@ -692,7 +696,7 @@ with tab3:
                 v_name = v_info["vendor"]
                 if v_name not in vendor_groups:
                     vendor_groups[v_name] = {"phone": v_info["phone"], "items": []}
-                vendor_groups[v_name]["items"].append(f"{item} {qty}{get_unit_for_item(cat, item)}")
+                vendor_groups[v_name]["items"].append(f"{item} {qty}{get_unit_for_item(PUR_DB, cat, item)}")
             
             for v_name, data in vendor_groups.items():
                 with st.expander(f"📦 {v_name} ({data['phone']})", expanded=True):
@@ -742,12 +746,12 @@ with tab4:
         log_branch = st.selectbox("Branch", branches, key="log_branch")
     
     with c2:
-        log_category = st.selectbox("Category", get_all_categories(), key="log_category")
-        log_items = get_items_by_category(log_category)
+        log_category = st.selectbox("Category", get_all_categories(INV_DB), key="log_category")
+        log_items = get_items_by_category(INV_DB, log_category)
         log_item = st.selectbox("Item", log_items, key="log_item")
     
     with c3:
-        log_unit = get_unit_for_item(log_category, log_item)
+        log_unit = get_unit_for_item(INV_DB, log_category, log_item)
         st.write(f"Unit: **{log_unit or '-'}**")
         
         # --- 실시간 재고 확인 로직 추가 ---
@@ -821,7 +825,7 @@ with tab5:
             with a1:
                 sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
             with a2:
-                sel_cat = st.selectbox("Category", ["All"] + get_all_categories(), key="ana_cat")
+                sel_cat = st.selectbox("Category", ["All"] + get_all_categories(INV_DB), key="ana_cat")
             with a3:
                 # 기간 선택 (월 단위)
                 year_options = sorted(set(history_df["DateObj"].dt.year))
@@ -945,112 +949,101 @@ if tab7:
         st.subheader("💾 Data Management / Settings")
         
         if check_login("tab7"):
-            st.markdown("### 1. Bulk Import Ingredients")
-            st.info("Upload an Excel file to register all your ingredients at once. Existing data will be overwritten/merged.")
-
-            # 1. 템플릿 다운로드
-            sample_data = [
-                {"Category": "Vegetable", "Item": "Onion", "Unit": "kg"},
-                {"Category": "Meat", "Item": "Chicken", "Unit": "kg"},
-                {"Category": "Sauce", "Item": "Soy Sauce", "Unit": "L"},
-            ]
-            sample_df = pd.DataFrame(sample_data)
+            st.markdown("### ⚙️ Database Management (데이터베이스 관리)")
             
-            template_buffer = io.BytesIO()
-            with pd.ExcelWriter(template_buffer, engine="openpyxl") as writer:
-                sample_df.to_excel(writer, index=False)
-            template_buffer.seek(0)
-            
-            st.download_button(
-                label="⬇ Download Excel Template",
-                data=template_buffer,
-                file_name="ingredient_template.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_template"
-            )
-
-            # 입력 방식 선택
-            input_mode = st.radio("Choose Input Method", ["Excel File Upload", "Copy & Paste from Excel"], key="input_mode", horizontal=True)
-
-            new_df = None
-
-            if input_mode == "Excel File Upload":
-                # 2. 파일 업로드 및 처리
-                uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"], key="file_uploader")
-                if uploaded_file is not None:
-                    try:
-                        new_df = pd.read_excel(uploaded_file)
-                    except Exception as e:
-                        st.error(f"Error reading Excel file: {e}")
-            else:
-                # 복사/붙여넣기 방식
-                st.write("1. Open your Excel file.")
-                st.write("2. Select and Copy (Ctrl+C) the data (including headers: Category, Item, Unit).")
-                st.write("3. Paste (Ctrl+V) into the box below.")
-                pasted_text = st.text_area("Paste Excel Data Here", height=200, key="pasted_text", help="Copy from Excel and paste here. Tab-separated values are supported.")
-                if pasted_text:
-                    try:
-                        # 엑셀에서 복사하면 기본적으로 탭으로 구분됨
-                        new_df = pd.read_csv(io.StringIO(pasted_text), sep="\t")
-                        if len(new_df.columns) < 2: # 탭이 아니면 콤마 시도
-                            new_df = pd.read_csv(io.StringIO(pasted_text), sep=",")
-                    except Exception as e:
-                        st.error(f"Error parsing pasted text: {e}")
-
-            if "import_success" in st.session_state:
-                st.success(st.session_state.import_success)
-                del st.session_state.import_success
-
-            if new_df is not None:
+            # 1. 공통 처리 함수 정의
+            def apply_data_to_db(df, target_file, label):
                 try:
-                    # 컬럼명 정규화 (대소문자 무시, 공백 제거)
-                    col_map = {c.lower().strip(): c for c in new_df.columns}
-                    
-                    # 필요한 컬럼 찾기
+                    col_map = {c.lower().strip(): c for c in df.columns}
                     cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
                     item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
                     unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), None)
 
                     if not cat_col or not item_col:
-                        st.error("Could not find 'Category' or 'Item' columns. Please check your headers.")
-                        st.dataframe(new_df.head())
-                    else:
-                        # 표준 컬럼으로 재구성
-                        process_df = pd.DataFrame()
-                        process_df["Category"] = new_df[cat_col].astype(str).str.strip()
-                        process_df["Item"] = new_df[item_col].astype(str).str.strip()
-                        process_df["Unit"] = new_df[unit_col].astype(str).str.strip() if unit_col else ""
-                        
-                        # 유효 데이터만 필터
-                        process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
-                                                process_df["Item"].notna() & (process_df["Item"] != "")]
+                        st.error(f"[{label}] 'Category' or 'Item' columns not found. Headers: {list(df.columns)}")
+                        return
 
-                        st.write("Preview of data to be applied:")
-                        st.dataframe(process_df.head(), use_container_width=True)
-                        st.write(f"Total {len(process_df)} items found.")
+                    process_df = pd.DataFrame()
+                    process_df["Category"] = df[cat_col].astype(str).str.strip()
+                    process_df["Item"] = df[item_col].astype(str).str.strip()
+                    process_df["Unit"] = df[unit_col].astype(str).str.strip() if unit_col else ""
+                    
+                    process_df = process_df[process_df["Category"].notna() & (process_df["Category"] != "") & 
+                                            process_df["Item"].notna() & (process_df["Item"] != "")]
 
-                        if st.button("✅ Apply to Database", key="apply_db"):
-                            with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                                for _, row in process_df.iterrows():
-                                    f.write(f"{row['Category']}\t{row['Item']}\t{row['Unit']}\n")
-                            st.session_state.import_success = f"Successfully updated {len(process_df)} items! The database is now permanently saved."
-                            st.rerun()
+                    st.write(f"Preview of {label} data:")
+                    st.dataframe(process_df.head(), use_container_width=True)
+                    st.write(f"Total {len(process_df)} items found in this file.")
 
+                    if st.button(f"✅ Apply to {label} Database", key=f"apply_{target_file}"):
+                        process_df.to_csv(target_file, index=False, encoding="utf-8-sig")
+                        st.success(f"Successfully updated {label} database!")
+                        st.rerun()
                 except Exception as e:
-                    st.error(f"Error processing file: {e}")
+                    st.error(f"Error processing {label} data: {e}")
+
+            # 2. 템플릿 다운로드 영역
+            with st.expander("📥 Download Excel Templates (엑셀 양식 다운로드)"):
+                sample_df = pd.DataFrame([{"Category": "Vegetable", "Item": "Onion", "Unit": "kg"}])
+                template_buffer = io.BytesIO()
+                with pd.ExcelWriter(template_buffer, engine="openpyxl") as writer:
+                    sample_df.to_excel(writer, index=False)
+                template_buffer.seek(0)
+                st.download_button("⬇ Download Template (.xlsx)", data=template_buffer, file_name="everest_template.xlsx", key="dl_tmpl")
 
             st.markdown("---")
-            st.markdown("### 2. Emergency Recovery")
-            st.warning("If file upload fails due to network issues, you can initialize the database with basic default ingredients.")
-            if st.button("🚀 Initialize with Sample Data", key="init_defaults"):
-                with open(ITEM_FILE, "w", encoding="utf-8") as f:
-                    f.write("Vegetable\tOnion\tkg\n")
-                    f.write("Meat\tChicken\tkg\n")
-                st.success("Sample database created! Reloading...")
+
+            # 3. 재고관리용 데이터 업로드 섹션
+            st.markdown("### 1. Inventory Items (재고관리용 목록)")
+            st.info("재고 등록 및 입출고 로그 기록 시 사용되는 품목 리스트입니다.")
+            i_col1, i_col2 = st.columns(2)
+            with i_col1:
+                up_inv = st.file_uploader("Upload Excel/CSV", type=["xlsx", "csv"], key="up_inv")
+                if up_inv:
+                    try:
+                        df_inv = pd.read_excel(up_inv) if up_inv.name.endswith('.xlsx') else pd.read_csv(up_inv)
+                        apply_data_to_db(df_inv, INV_DB, "Inventory")
+                    except Exception as e: st.error(e)
+            with i_col2:
+                paste_inv = st.text_area("Paste Data (from Excel)", key="paste_inv", height=100, help="엑셀에서 복사하여 붙여넣으세요.")
+                if paste_inv:
+                    try:
+                        df_inv_p = pd.read_csv(io.StringIO(paste_inv), sep="\t")
+                        apply_data_to_db(df_inv_p, INV_DB, "Inventory")
+                    except Exception as e: st.error(e)
+
+            st.markdown("---")
+
+            # 4. 구매용 데이터 업로드 섹션
+            st.markdown("### 2. Purchase Items (구매/주문용 목록)")
+            st.info("구매 탭에서 문자 발송을 위해 구성되는 주문 품목 리스트입니다.")
+            p_col1, p_col2 = st.columns(2)
+            with p_col1:
+                up_pur = st.file_uploader("Upload Excel/CSV", type=["xlsx", "csv"], key="up_pur")
+                if up_pur:
+                    try:
+                        df_pur = pd.read_excel(up_pur) if up_pur.name.endswith('.xlsx') else pd.read_csv(up_pur)
+                        apply_data_to_db(df_pur, PUR_DB, "Purchase")
+                    except Exception as e: st.error(e)
+            with p_col2:
+                paste_pur = st.text_area("Paste Data (from Excel)", key="paste_pur", height=100, help="엑셀에서 복사하여 붙여넣으세요.")
+                if paste_pur:
+                    try:
+                        df_pur_p = pd.read_csv(io.StringIO(paste_pur), sep="\t")
+                        apply_data_to_db(df_pur_p, PUR_DB, "Purchase")
+                    except Exception as e: st.error(e)
+
+            st.markdown("---")
+            st.markdown("### 3. Emergency Recovery")
+            if st.button("🚀 Initialize with Default Data", key="init_defaults"):
+                default_df = pd.DataFrame([["Vegetable", "Onion", "kg"]], columns=["Category", "Item", "Unit"])
+                default_df.to_csv(INV_DB, index=False, encoding="utf-8-sig")
+                default_df.to_csv(PUR_DB, index=False, encoding="utf-8-sig")
+                st.success("Databases initialized! Reloading...")
                 st.rerun()
 
 # ======================================================
-# TAB 7: Help Manual (All)
+# TAB 8: Help Manual (All)
 # ======================================================
 with tab8:
     st.header("🏔 Everest Inventory System - Help Manual")
