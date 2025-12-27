@@ -152,7 +152,12 @@ if not st.session_state["splash_shown"]:
 ingredient_list = []
 
 # ================= Files (Absolute Paths for Persistence) ==================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Render Persistent Disk (/data) 확인, 없으면 현재 디렉토리 사용
+if os.path.exists("/data"):
+    BASE_DIR = "/data"
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
 HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
 ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 원본 (백업용)
