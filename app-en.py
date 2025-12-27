@@ -1070,16 +1070,26 @@ if tab7:
                 up_inv = st.file_uploader("Upload Excel/CSV", type=["xlsx", "csv"], key="up_inv")
                 if up_inv:
                     try:
-                        df_inv = pd.read_excel(up_inv) if up_inv.name.endswith('.xlsx') else pd.read_csv(up_inv)
+                        if up_inv.name.endswith('.xlsx'):
+                            df_inv = pd.read_excel(up_inv)
+                        else:
+                            # 템플릿용 파일이므로 robust_read_csv 대신 StringIO와 encoding 시도
+                            df_inv = robust_read_csv(up_inv)
                         apply_data_to_db(df_inv, INV_DB, "Inventory")
-                    except Exception as e: st.error(e)
+                    except Exception as e: st.error(f"Upload error: {e}")
             with i_col2:
                 paste_inv = st.text_area("Paste Data (from Excel)", key="paste_inv", height=100, help="엑셀에서 복사하여 붙여넣으세요.")
                 if paste_inv:
                     try:
+                        # 붙여넣기 데이터는 보통 탭 구분
                         df_inv_p = pd.read_csv(io.StringIO(paste_inv), sep="\t")
                         apply_data_to_db(df_inv_p, INV_DB, "Inventory")
-                    except Exception as e: st.error(e)
+                    except Exception as e:
+                        # 탭 실패 시 콤마 시도
+                        try:
+                            df_inv_p = pd.read_csv(io.StringIO(paste_inv))
+                            apply_data_to_db(df_inv_p, INV_DB, "Inventory")
+                        except: st.error(f"Paste error: {e}")
 
             st.markdown("---")
 
@@ -1091,16 +1101,23 @@ if tab7:
                 up_pur = st.file_uploader("Upload Excel/CSV", type=["xlsx", "csv"], key="up_pur")
                 if up_pur:
                     try:
-                        df_pur = pd.read_excel(up_pur) if up_pur.name.endswith('.xlsx') else pd.read_csv(up_pur)
+                        if up_pur.name.endswith('.xlsx'):
+                            df_pur = pd.read_excel(up_pur)
+                        else:
+                            df_pur = robust_read_csv(up_pur)
                         apply_data_to_db(df_pur, PUR_DB, "Purchase")
-                    except Exception as e: st.error(e)
+                    except Exception as e: st.error(f"Upload error: {e}")
             with p_col2:
                 paste_pur = st.text_area("Paste Data (from Excel)", key="paste_pur", height=100, help="엑셀에서 복사하여 붙여넣으세요.")
                 if paste_pur:
                     try:
                         df_pur_p = pd.read_csv(io.StringIO(paste_pur), sep="\t")
                         apply_data_to_db(df_pur_p, PUR_DB, "Purchase")
-                    except Exception as e: st.error(e)
+                    except Exception as e:
+                        try:
+                            df_pur_p = pd.read_csv(io.StringIO(paste_pur))
+                            apply_data_to_db(df_pur_p, PUR_DB, "Purchase")
+                        except: st.error(f"Paste error: {e}")
 
             st.markdown("---")
             st.markdown("### 3. Emergency Recovery")
