@@ -164,6 +164,7 @@ ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 원본 (백�
 INV_DB = os.path.join(BASE_DIR, "inventory_db.csv")             # 재고용 DB
 PUR_DB = os.path.join(BASE_DIR, "purchase_db.csv")              # 구매용 DB
 VENDOR_FILE = os.path.join(BASE_DIR, "vendor_mapping.csv")      # 구매처 매핑 DB
+ORDERS_FILE = os.path.join(BASE_DIR, "orders_db.csv")           # 발주(주문) 내역 DB
 
 # ================= Login Logic ==================
 if "logged_in" not in st.session_state:
@@ -456,6 +457,19 @@ def load_history():
 
 def save_history(df):
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
+
+def load_orders():
+    df = robust_read_csv(ORDERS_FILE)
+    expected = ["OrderId", "Date", "Branch", "Vendor", "Items", "Status", "CreatedDate"]
+    if df.empty:
+        return pd.DataFrame(columns=expected)
+    for col in expected:
+        if col not in df.columns:
+            df[col] = ""
+    return df[expected]
+
+def save_orders(df):
+    df.to_csv(ORDERS_FILE, index=False, encoding="utf-8-sig")
 
 # ================= Session & Data Refresh ==================
 # 매 리런(Rerun) 마다 최신 데이터를 파일에서 직접 읽어오도록 하여 실시간성 확보
@@ -834,6 +848,96 @@ with tab3:
                         if st.button(f"📋 Copy Message", key=f"copy_{v_name}"):
                             st.code(sms_body)
                             st.success("복사 완료!")
+
+                    # --- Save Order Feature ---
+                    if st.button(f"💾 Save Order Record (발주 기록 저장)", key=f"save_order_{v_name}", use_container_width=True):
+                        import uuid
+                        import json
+                        
+                        orders_df = load_orders()
+                        new_order = {
+                            "OrderId": str(uuid.uuid4()),
+                            "Date": str(p_date),
+                            "Branch": p_branch,
+                            "Vendor": v_name,
+                            "Items": json.dumps(data["items"], ensure_ascii=False),
+                            "Status": "Pending",
+                            "CreatedDate": str(datetime.now())
+                        }
+                        
+                        # pd.concat to add row
+                        new_row_df = pd.DataFrame([new_order])
+                        orders_df = pd.concat([orders_df, new_row_df], ignore_index=True)
+                        save_orders(orders_df)
+                        st.success(f"Order for {v_name} saved as Pending!")
+                    # --------------------------
+
+            # ==========================================
+            # 3. Order Status & Receiving (Pending Orders)
+            # ==========================================
+            st.markdown("---")
+            st.subheader("3. Order Status (발주 현황 및 입고 처리)")
+            st.info("발주 후 도착한 물품을 확인하고 '입고 확정' 버튼을 누르면 재고에 자동 반영됩니다.")
+            
+            orders_df = load_orders()
+            if not orders_df.empty:
+                # Pending 상태인 것만 조회
+                pending_orders = orders_df[orders_df["Status"] == "Pending"].sort_values("CreatedDate", ascending=False)
+                
+                if pending_orders.empty:
+                    st.write("대기 중인 발주 내역이 없습니다.")
+                else:
+                    import json
+                    for idx, row in pending_orders.iterrows():
+                        oid = row["OrderId"]
+                        o_date = row["Date"]
+                        o_branch = row["Branch"]
+                        o_vendor = row["Vendor"]
+                        o_items = json.loads(row["Items"]) # List of dicts
+                        
+                        with st.status(f"📅 {o_date} | 🏢 {o_branch} | 🚚 {o_vendor}", expanded=False):
+                            st.write(f"**Items:**")
+                            for item in o_items:
+                                st.write(f"- {item['item']} ({item['qty']} {item['unit']})")
+                            
+                            if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
+                                # 1. Update Inventory & History
+                                inv_df = st.session_state.inventory.copy()
+                                hist_df = st.session_state.history.copy()
+                                
+                                for item in o_items:
+                                    cat, i_name, qty, unit = item["cat"], item["item"], float(item["qty"]), item["unit"]
+                                    
+                                    # History Log
+                                    hist_df.loc[len(hist_df)] = [
+                                        str(date.today()), o_branch, cat, i_name, unit, "IN", qty
+                                    ]
+                                    
+                                    # Inventory Update
+                                    mask = (inv_df["Branch"] == o_branch) & (inv_df["Item"] == i_name) & (inv_df["Category"] == cat)
+                                    if mask.any():
+                                        current_qty = float(inv_df.loc[mask, "CurrentQty"].values[0])
+                                        inv_df.loc[mask, "CurrentQty"] = current_qty + qty
+                                    else:
+                                        # New Item entry
+                                        new_row = pd.DataFrame(
+                                            [[o_branch, i_name, cat, unit, qty, 0, "", str(date.today())]],
+                                            columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+                                        )
+                                        inv_df = pd.concat([inv_df, new_row], ignore_index=True)
+
+                                # 2. Update Order Status
+                                orders_df.loc[orders_df["OrderId"] == oid, "Status"] = "Completed"
+                                
+                                # 3. Save All
+                                st.session_state.inventory = inv_df
+                                st.session_state.history = hist_df
+                                save_inventory(inv_df)
+                                save_history(hist_df)
+                                save_orders(orders_df)
+                                
+                                st.success("Received successfully! Inventory updated.")
+                                st.rerun()
 
 # ======================================================
 # TAB 4: IN/OUT Log (All)
