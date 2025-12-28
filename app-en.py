@@ -765,11 +765,15 @@ with tab3:
                 
                 # 3. 그래도 없으면 미지정
                 if not v_info:
-                    v_info = {"vendor": "미지정 (Unknown)", "phone": ""}
+                    # 매핑 정보가 없을 경우, 디버깅을 위해 카테고리를 함께표시
+                    v_name = f"미지정 (Unknown) - {cat}"
+                    v_phone = ""
+                else:
+                    v_name = v_info["vendor"]
+                    v_phone = v_info["phone"]
                 
-                v_name = v_info["vendor"]
                 if v_name not in vendor_groups:
-                    vendor_groups[v_name] = {"phone": v_info["phone"], "items": []}
+                    vendor_groups[v_name] = {"phone": v_phone, "items": []}
                 vendor_groups[v_name]["items"].append({
                     "cat": cat,
                     "item": item,
@@ -1157,8 +1161,8 @@ if tab7:
                     col_map = {c.lower().strip(): c for c in df.columns}
                     cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), None)
                     item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None)
-                    vendor_col = next((col_map[k] for k in ["vendor", "구매처", "업체"] if k in col_map), None)
-                    phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처"] if k in col_map), None)
+                    vendor_col = next((col_map[k] for k in ["vendor", "vender", "구매처", "업체"] if k in col_map), None)
+                    phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처", "contact"] if k in col_map), None)
 
                     if not item_col or not vendor_col:
                         st.error(f"Missing columns! Requires Item, Vendor, Phone. Found: {list(df.columns)}")
