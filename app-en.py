@@ -691,6 +691,16 @@ with tab3:
     vendor_map = load_vendor_mapping()
     all_items = load_item_db(PUR_DB)
     
+    # --- Date & Branch Selection (New) ---
+    pb_col1, pb_col2 = st.columns(2)
+    with pb_col1:
+        p_date = st.date_input("날짜 (Date)", value=date.today(), key="p_date")
+    with pb_col2:
+        p_branch = st.selectbox("지점 (Branch)", branches, key="p_branch")
+    
+    st.markdown("---")
+    # -------------------------------------
+    
     if "purchase_cart" not in st.session_state:
         st.session_state.purchase_cart = {} # {(category, item): qty}
         
@@ -805,7 +815,7 @@ with tab3:
                     items_str = ", ".join(final_items_list)
                     
                     # SMS Body Construction
-                    sms_body = f"[Everest 구매요청]\n{items_str}"
+                    sms_body = f"[Everest 구매요청]\n날짜: {p_date}\n지점: {p_branch}\n\n{items_str}"
                     import urllib.parse
                     encoded_body = urllib.parse.quote(sms_body)
                     sms_link = f"sms:{data['phone']}?body={encoded_body}"
