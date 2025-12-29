@@ -742,9 +742,10 @@ with tab3:
             with r_col2:
                 # 현재 장바구니에 담긴 값이 있다면 기본값으로 보여줌
                 current_val = st.session_state.purchase_cart.get(ikey, 0.0)
+                reset_key = st.session_state.get("reset_trigger", 0)
                 temp_qty = st.number_input("", min_value=0.0, step=1.0, 
                                           value=float(current_val),
-                                          key=f"p_input_{p_cat}_{idx}", 
+                                          key=f"p_input_{p_cat}_{idx}_{reset_key}", 
                                           label_visibility="collapsed")
             
             with r_col3:
@@ -752,7 +753,7 @@ with tab3:
                 if st.button("Done", key=f"done_btn_{p_cat}_{idx}", use_container_width=True):
                     if temp_qty > 0:
                         st.session_state.purchase_cart[ikey] = temp_qty
-                        st.toast(f"✅ {item_info['item']} added!")
+                        st.toast(f"✅ {item_info['item']} {temp_qty}{item_info['unit']} Added!", icon="🛒")
                     else:
                         if ikey in st.session_state.purchase_cart:
                             del st.session_state.purchase_cart[ikey]
@@ -761,6 +762,7 @@ with tab3:
         st.write("---")
         if st.button("🗑 Reset All", key="reset_cart", use_container_width=True):
             st.session_state.purchase_cart = {}
+            st.session_state["reset_trigger"] = st.session_state.get("reset_trigger", 0) + 1
             st.rerun()
 
     with p_col2:
@@ -896,37 +898,69 @@ with tab3:
                         o_items = json.loads(row["Items"]) # List of dicts
                         
                         with st.status(f"📅 {o_date} | 🏢 {o_branch} | 🚚 {o_vendor}", expanded=False):
-                            st.write(f"**Items:**")
-                            for item in o_items:
-                                st.write(f"- {item['item']} ({item['qty']} {item['unit']})")
+                            
+                            # Convert items to DataFrame for editing
+                            # Check if o_items is list of dicts. 
+                            # If so, create DF. columns: Item, Qty, Unit, Category
+                            p_items_df = pd.DataFrame(o_items)
+                            
+                            # Clean up column names for display if needed or keep keys
+                            # Standard keys: 'cat', 'item', 'qty', 'unit'
+                            # Renaming for better UI
+                            p_items_df = p_items_df.rename(columns={"item": "Item", "qty": "Qty", "unit": "Unit", "cat": "Category"})
+                            # Reorder for display
+                            p_items_df = p_items_df[["Category", "Item", "Qty", "Unit"]]
+                            
+                            st.write("▼ 아래 표에서 실 수령 수량을 수정한 뒤 '입고 확정'을 누르세요.")
+                            edited_df = st.data_editor(
+                                p_items_df,
+                                column_config={
+                                    "Qty": st.column_config.NumberColumn("Receipt Qty", min_value=0.0, step=0.5, format="%.1f"),
+                                    "Item": st.column_config.TextColumn("Item", disabled=True),
+                                    "Unit": st.column_config.TextColumn("Unit", disabled=True),
+                                    "Category": st.column_config.TextColumn("Category", disabled=True),
+                                },
+                                use_container_width=True,
+                                key=f"editor_{oid}",
+                                num_rows="fixed"
+                            )
                             
                             if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
-                                # 1. Update Inventory & History
+                                # 1. Update Inventory & History based on EDITED df
                                 inv_df = st.session_state.inventory.copy()
                                 hist_df = st.session_state.history.copy()
                                 
-                                for item in o_items:
-                                    cat, i_name, qty, unit = item["cat"], item["item"], float(item["qty"]), item["unit"]
+                                # Convert back to list of dicts to save in order history
+                                final_items = []
+                                
+                                for _, e_row in edited_df.iterrows():
+                                    cat, i_name, qty, unit = e_row["Category"], e_row["Item"], float(e_row["Qty"]), e_row["Unit"]
                                     
-                                    # History Log
-                                    hist_df.loc[len(hist_df)] = [
-                                        str(date.today()), o_branch, cat, i_name, unit, "IN", qty
-                                    ]
+                                    # Update final items for record
+                                    final_items.append({"cat": cat, "item": i_name, "qty": qty, "unit": unit})
                                     
-                                    # Inventory Update
-                                    mask = (inv_df["Branch"] == o_branch) & (inv_df["Item"] == i_name) & (inv_df["Category"] == cat)
-                                    if mask.any():
-                                        current_qty = float(inv_df.loc[mask, "CurrentQty"].values[0])
-                                        inv_df.loc[mask, "CurrentQty"] = current_qty + qty
-                                    else:
-                                        # New Item entry
-                                        new_row = pd.DataFrame(
-                                            [[o_branch, i_name, cat, unit, qty, 0, "", str(date.today())]],
-                                            columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
-                                        )
-                                        inv_df = pd.concat([inv_df, new_row], ignore_index=True)
+                                    if qty > 0:
+                                        # History Log
+                                        hist_df.loc[len(hist_df)] = [
+                                            str(date.today()), o_branch, cat, i_name, unit, "IN", qty
+                                        ]
+                                        
+                                        # Inventory Update
+                                        mask = (inv_df["Branch"] == o_branch) & (inv_df["Item"] == i_name) & (inv_df["Category"] == cat)
+                                        if mask.any():
+                                            current_qty = float(inv_df.loc[mask, "CurrentQty"].values[0])
+                                            inv_df.loc[mask, "CurrentQty"] = current_qty + qty
+                                        else:
+                                            # New Item entry
+                                            new_row = pd.DataFrame(
+                                                [[o_branch, i_name, cat, unit, qty, 0, "", str(date.today())]],
+                                                columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+                                            )
+                                            inv_df = pd.concat([inv_df, new_row], ignore_index=True)
 
-                                # 2. Update Order Status
+                                # 2. Update Order Status & Received Items
+                                # Update the items content with the edited values so history shows actual received
+                                orders_df.loc[orders_df["OrderId"] == oid, "Items"] = json.dumps(final_items, ensure_ascii=False)
                                 orders_df.loc[orders_df["OrderId"] == oid, "Status"] = "Completed"
                                 
                                 # 3. Save All
@@ -936,8 +970,34 @@ with tab3:
                                 save_history(hist_df)
                                 save_orders(orders_df)
                                 
-                                st.success("Received successfully! Inventory updated.")
+                                st.success("Received successfully with updated quantities! Inventory updated.")
                                 st.rerun()
+
+            # --- Completed Orders View ---
+            st.markdown("---")
+            with st.expander("📜 View Completed Orders (입고 완료 내역)", expanded=False):
+                completed_orders = orders_df[orders_df["Status"] == "Completed"].sort_values("CreatedDate", ascending=False)
+                
+                if completed_orders.empty:
+                    st.info("No completed orders yet.")
+                else:
+                    st.write(f"Total: {len(completed_orders)} orders")
+                    
+                    for idx, row in completed_orders.iterrows():
+                        oid = row["OrderId"]
+                        o_date = row["Date"]
+                        o_branch = row["Branch"]
+                        o_vendor = row["Vendor"]
+                        o_items = json.loads(row["Items"])
+                        
+                        st.markdown(f"**{o_date} | {o_branch} | {o_vendor}**")
+                        
+                        # Simple table for items
+                        c_items_df = pd.DataFrame(o_items)
+                        if not c_items_df.empty:
+                            c_items_df = c_items_df.rename(columns={"item": "Item", "qty": "Qty", "unit": "Unit", "cat": "Category"})
+                            st.dataframe(c_items_df[["Category", "Item", "Qty", "Unit"]], use_container_width=True, hide_index=True)
+                        st.divider()
 
 # ======================================================
 # TAB 4: IN/OUT Log (All)
