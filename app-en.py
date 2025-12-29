@@ -747,12 +747,19 @@ with tab3:
             # 행(Row) 구성: 품목명 | 수량입력 | Done버튼
             r_col1, r_col2, r_col3 = st.columns([5, 3, 2])
             
+            # Check if item is already in cart
+            in_cart = ikey in st.session_state.purchase_cart
+            cart_qty = st.session_state.purchase_cart.get(ikey, 0.0)
+
             with r_col1:
-                st.write(f"**{item_info['item']}** ({item_info['unit']})")
+                if in_cart:
+                    st.markdown(f"**{item_info['item']}** ({item_info['unit']}) <span style='color:#4ade80; font-weight:bold; background:#064e3b; padding:2px 6px; border-radius:4px;'>✅ 담김 ({cart_qty})</span>", unsafe_allow_html=True)
+                else:
+                    st.write(f"**{item_info['item']}** ({item_info['unit']})")
             
             with r_col2:
                 # 현재 장바구니에 담긴 값이 있다면 기본값으로 보여줌
-                current_val = st.session_state.purchase_cart.get(ikey, 0.0)
+                current_val = cart_qty
                 reset_key = st.session_state.get("reset_trigger", 0)
                 temp_qty = st.number_input("", min_value=0.0, step=1.0, 
                                           value=float(current_val),
@@ -768,6 +775,7 @@ with tab3:
                     else:
                         if ikey in st.session_state.purchase_cart:
                             del st.session_state.purchase_cart[ikey]
+                            st.toast(f"🗑 {item_info['item']} removed!", icon="🗑")
                     st.rerun()
 
         st.write("---")
@@ -1306,9 +1314,12 @@ if tab7:
                     st.dataframe(process_df.head(), use_container_width=True)
                     st.write(f"Total {len(process_df)} items found in this file.")
 
-                    if st.button(f"✅ Apply to {label} Database", key=f"apply_{target_file}"):
+                    if st.button(f"✅ Apply to {label} Database (적용하기)", key=f"apply_{target_file}", type="primary"):
                         process_df.to_csv(target_file, index=False, encoding="utf-8-sig")
-                        st.success(f"Successfully updated {label} database!")
+                        st.balloons()
+                        st.success(f"🎉 Successfully updated {label} database! (데이터베이스에 적용되었습니다)")
+                        import time
+                        time.sleep(1.5) # Wait for user to see the success message
                         st.rerun()
                 except Exception as e:
                     st.error(f"Error processing {label} data: {e}")
