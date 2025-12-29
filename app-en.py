@@ -1230,14 +1230,57 @@ if tab7:
             
             # Storage Status Warning
             if BASE_DIR == "/data":
-                 st.success("✅ **보존형 저장소 사용 중 (Persistent Storage)**: 데이터가 서버의 보존형 디스크(/data)에 저장됩니다. (재부팅 시 유지됨)")
+                 st.success("✅ **연결 성공 (Connected)**: 보존형 디스크(/data)가 정상적으로 연결되었습니다. 이제 데이터를 업로드하면 영구적으로 저장됩니다.")
             else:
-                 st.warning("⚠️ **임시 저장소 사용 중 (Temporary Storage)**: 데이터가 임시 폴더에 저장됩니다. 서버가 재시작되면 데이터가 사라집니다. Render Dashboard에서 Disk 설정을 확인하세요.")
-            st.markdown(f"- **Current Data Path**: `{BASE_DIR}`")
+                 st.error("⚠️ **저장소 미연결 (Not Connected)**: 디스크가 연결되지 않았습니다. Render 대시보드에서 설정을 확인하세요.")
+            
             st.write("---")
             
-            # Initialization
-            st.warning("⚠️ **Warning**: 'Initialize' deletes all existing data. (초기화 시 모든 데이터 삭제됨)")
+            # --- 2. Current Data Status (현재 데이터 상태 확인) ---
+            st.markdown("### 📊 Current Data Status (현재 저장된 데이터)")
+            
+            # Inventory DB Status
+            inv_count = 0
+            if os.path.exists(INV_DB):
+                try:
+                    inv_count = len(robust_read_csv(INV_DB))
+                    st.success(f"**Inventory DB**: ✅ {inv_count} items saved.")
+                except:
+                    st.error("**Inventory DB**: ❌ File corrupted.")
+            else:
+                st.warning("**Inventory DB**: ❌ Empty (Not Found). Please upload data below.")
+
+            # Purchase DB Status
+            pur_count = 0
+            if os.path.exists(PUR_DB):
+                try:
+                    pur_count = len(robust_read_csv(PUR_DB))
+                    st.success(f"**Purchase DB**: ✅ {pur_count} items saved.")
+                except:
+                     st.error("**Purchase DB**: ❌ File corrupted.")
+            else:
+                st.warning("**Purchase DB**: ❌ Empty (Not Found). Please upload data below.")
+
+            st.write("---")
+
+            # --- 3. Factory Reset (High Risk) ---
+            with st.expander("⚠️ Factory Reset (데이터 초기화 - 주의!)"):
+                st.error("이 버튼을 누르면 모든 데이터가 영구적으로 삭제됩니다. 처음부터 다시 시작할 때만 사용하세요.")
+                if st.button("🧨 Delete All Data (모든 데이터 삭제)", key="init_btn", type="primary"):
+                    try:
+                        files_to_delete = [INV_DB, PUR_DB, VENDOR_FILE, ORDERS_FILE, DATA_FILE, HISTORY_FILE]
+                        for f in files_to_delete:
+                            if os.path.exists(f):
+                                os.remove(f)
+                        st.session_state.inventory = pd.DataFrame()
+                        st.session_state.history = pd.DataFrame()
+                        st.session_state.purchase_cart = {}
+                        st.success("All data deleted successfully. (모든 데이터가 삭제되었습니다)")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error deleting data: {e}")
+                    
+            # 1. 공통 처리 함수 정의
             
             # 1. 공통 처리 함수 정의
             def apply_data_to_db(df, target_file, label):
