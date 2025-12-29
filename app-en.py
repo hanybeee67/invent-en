@@ -481,6 +481,16 @@ st.session_state.history = load_history()
 
 branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
 
+# --- Storage Status Check ---
+storage_mode = "Unknown"
+if BASE_DIR == "/data":
+    storage_mode = "Persistent 🟢"
+    storage_msg = "Data is saved to Persistent Disk (/data)."
+else:
+    storage_mode = "Temporary ⚠️"
+    storage_msg = "Data is saved locally (Temporary). Data may be lost on restart if on cloud."
+# ----------------------------
+
 # ================= Header (Compact) ==================
 col_h1, col_h2 = st.columns([0.5, 9.5])
 
@@ -493,10 +503,11 @@ with col_h1:
 with col_h2:
     h_col1, h_col2 = st.columns([8, 2])
     with h_col1:
-        st.markdown("""
+        st.markdown(f"""
         <div style="display: flex; align-items: baseline; gap: 15px;">
             <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">Everest Inventory</h1>
             <p class="subtitle-text" style="margin: 0;">Professional Stock Management System</p>
+            <span style="font-size: 0.8rem; background: #334155; padding: 2px 8px; border-radius: 4px; color: #94a3b8;">{storage_mode}</span>
         </div>
         """, unsafe_allow_html=True)
     with h_col2:
@@ -1215,7 +1226,18 @@ if tab7:
         st.subheader("💾 Data Management / Settings")
         
         if check_login("tab7"):
-            st.markdown("### ⚙️ Database Management (데이터베이스 관리)")
+            st.markdown(f"### ⚙️ System Configuration")
+            
+            # Storage Status Warning
+            if BASE_DIR == "/data":
+                 st.success("✅ **보존형 저장소 사용 중 (Persistent Storage)**: 데이터가 서버의 보존형 디스크(/data)에 저장됩니다. (재부팅 시 유지됨)")
+            else:
+                 st.warning("⚠️ **임시 저장소 사용 중 (Temporary Storage)**: 데이터가 임시 폴더에 저장됩니다. 서버가 재시작되면 데이터가 사라집니다. Render Dashboard에서 Disk 설정을 확인하세요.")
+            st.markdown(f"- **Current Data Path**: `{BASE_DIR}`")
+            st.write("---")
+            
+            # Initialization
+            st.warning("⚠️ **Warning**: 'Initialize' deletes all existing data. (초기화 시 모든 데이터 삭제됨)")
             
             # 1. 공통 처리 함수 정의
             def apply_data_to_db(df, target_file, label):
