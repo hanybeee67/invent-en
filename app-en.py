@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from datetime import date, datetime
 import io
+from drive_utils import upload_file_to_drive
 
 # ================= Page Config ==================
 st.set_page_config(
@@ -990,7 +991,19 @@ with tab3:
                                 num_rows="fixed"
                             )
                             
-                            if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
+                            # --- Google Drive Upload Section ---
+                            st.markdown("#### 📸 Upload Invoice (거래명세서 업로드)")
+                            
+                            # Folder ID Settings (나중에 설정 탭으로 이동 가능)
+                            # 사용자가 제공한 ID가 없으므로 일단 Input 필드로 받거나, 기본값을 상수로 둠.
+                            # 편의를 위해 여기서 바로 입력받도록 기획 변경 (전역 설정이 더 좋지만 급한대로)
+                            # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
+                            default_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
+                            drive_folder_id = st.text_input("Google Drive Folder ID", value=default_folder_id, key=f"fid_{oid}", help="업로드할 구글 드라이브 폴더의 ID를 입력하세요.", type="password")
+                            
+                            img_file = st.camera_input("Take a picture", key=f"cam_{oid}")
+                            
+                            if st.button("📥 Confirm Receipt & Upload (입고 확정 및 업로드)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
                                 inv_df = st.session_state.inventory.copy()
                                 hist_df = st.session_state.history.copy()
@@ -1035,7 +1048,27 @@ with tab3:
                                 save_history(hist_df)
                                 save_orders(orders_df)
                                 
-                                st.success("Received successfully with updated quantities! Inventory updated.")
+                                st.success("Received successfully with updated quantities! (재고 반영 완료)")
+                                
+                                # 4. Google Drive Upload Logic
+                                if img_file:
+                                    if drive_folder_id:
+                                        # File name format: YYYYMMDD_Branch_Vendor.jpg
+                                        file_name = f"{o_date.replace('-','')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
+                                        file_id = upload_file_to_drive(img_file, file_name, drive_folder_id)
+                                        
+                                        if file_id:
+                                            st.toast(f"✅ Photo uploaded to Drive! (ID: {file_id})", icon="☁️")
+                                            st.write(f"✅ 거래명세서 업로드 완료: `{file_name}`")
+                                        else:
+                                            st.error("❌ Failed to upload photo to Drive. Check logs.")
+                                    else:
+                                        st.warning("⚠️ Folder ID is missing. Photo was NOT uploaded. (폴더 ID를 입력해주세요)")
+                                else:
+                                    st.info("ℹ️ No photo taken. Skipping upload.")
+
+                                import time
+                                time.sleep(2) # 결과 확인을 위한 딜레이
                                 st.rerun()
 
             # --- Completed Orders View ---
