@@ -855,23 +855,10 @@ with tab3:
                     encoded_body = urllib.parse.quote(sms_body)
                     sms_link = f"sms:{data['phone']}?body={encoded_body}"
                     
-                    col_btn1, col_btn2 = st.columns(2)
-                    with col_btn1:
-                        st.markdown(f'''
-                            <a href="{sms_link}" target="_blank" style="
-                                text-decoration: none; color: white;
-                                background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-                                padding: 10px 20px; border-radius: 8px;
-                                display: inline-block; font-weight: 600; width: 100%; text-align: center;
-                            ">📲 Send SMS (문자발송)</a>
-                        ''', unsafe_allow_html=True)
-                    with col_btn2:
-                        if st.button(f"📋 Copy Message", key=f"copy_{v_name}"):
-                            st.code(sms_body)
-                            st.success("복사 완료!")
-
-                    # --- Save Order Feature ---
-                    if st.button(f"💾 Save Order Record (발주 기록 저장)", key=f"save_order_{v_name}", use_container_width=True):
+                    # --- Consolidated Button (SMS + Save) ---
+                    # 하나의 버튼으로 저장과 동시에 SMS 앱을 열도록 시도(메타 태그 활용)
+                    if st.button(f"📲 Send SMS & Save Order (저장 및 문자발송)", key=f"btn_process_{v_name}", use_container_width=True):
+                        # 1. Save Logic
                         import uuid
                         import json
                         
@@ -886,12 +873,71 @@ with tab3:
                             "CreatedDate": str(datetime.now())
                         }
                         
-                        # pd.concat to add row
                         new_row_df = pd.DataFrame([new_order])
                         orders_df = pd.concat([orders_df, new_row_df], ignore_index=True)
                         save_orders(orders_df)
-                        st.success(f"Order for {v_name} saved as Pending!")
-                    # --------------------------
+                        
+                        # 2. Trigger SMS Open
+                        st.success(f"✅ {v_name} 주문이 저장되었습니다! 문자 앱이 열립니다...")
+                        
+                        # JavaScript / Meta refresh to open link
+                        st.markdown(f'<meta http-equiv="refresh" content="0; url={sms_link}">', unsafe_allow_html=True)
+                        
+                        # Fallback Link (혹시 자동 연결 안될 경우 대비)
+                        st.markdown(f"혹시 문자가 안 열리면? 👉 [문자 보내기 클릭]({sms_link})")
+
+
+            # --- Global Bulk Action ---
+            st.markdown("---")
+            st.markdown("### 🚀 Batch Process (전체 발주 저장)")
+            
+            if st.button("🚀 Save ALL Orders & Show SMS Links (전체 저장 및 문자보내기)", key="save_all_global", type="primary", use_container_width=True):
+                import uuid
+                import json
+                
+                orders_df = load_orders()
+                saved_vendors = []
+                
+                # Iterate all vendors in cart
+                for v_name_g, data_g in vendor_groups.items():
+                    # Create Order Record
+                    new_order_g = {
+                        "OrderId": str(uuid.uuid4()),
+                        "Date": str(p_date),
+                        "Branch": p_branch,
+                        "Vendor": v_name_g,
+                        "Items": json.dumps(data_g["items"], ensure_ascii=False),
+                        "Status": "Pending",
+                        "CreatedDate": str(datetime.now())
+                    }
+                    orders_df = pd.concat([orders_df, pd.DataFrame([new_order_g])], ignore_index=True)
+                    saved_vendors.append(v_name_g)
+                
+                save_orders(orders_df)
+                st.success(f"✅ 총 {len(saved_vendors)}개 업체의 주문이 모두 'Pending' 상태로 저장되었습니다!")
+                
+                st.markdown("#### 👇 아래 링크를 눌러 각 업체에 문자를 보내세요!")
+                
+                # Show Links for each vendor
+                for v_name_g in saved_vendors:
+                    # Reconstruct SMS body
+                    data_g = vendor_groups[v_name_g]
+                    # items_str logic
+                    f_list = [f"{item['item']} {item['qty']}{item['unit']}" for item in data_g["items"]]
+                    i_str = ", ".join(f_list)
+                    
+                    s_body = f"[Everest 구매요청]\n날짜: {p_date}\n지점: {p_branch}\n\n{i_str}"
+                    enc_body = urllib.parse.quote(s_body)
+                    s_link = f"sms:{data_g['phone']}?body={enc_body}"
+                    
+                    st.markdown(f'''
+                        <a href="{s_link}" target="_blank" style="
+                            text-decoration: none; color: white;
+                            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+                            padding: 12px 20px; border-radius: 8px;
+                            display: block; font-weight: 600; text-align: center; margin-bottom: 10px;
+                        ">📲 {v_name_g}에게 문자 보내기 ({data_g['phone']})</a>
+                    ''', unsafe_allow_html=True)
 
             # ==========================================
             # 3. Order Status & Receiving (Pending Orders)
