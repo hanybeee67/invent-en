@@ -991,20 +991,15 @@ with tab3:
                                 num_rows="fixed"
                             )
                             
-                            # --- Google Drive Upload Section ---
-                            st.markdown("#### 📸 Upload Invoice (거래명세서 업로드)")
-                            
-                            # Folder ID Settings (나중에 설정 탭으로 이동 가능)
-                            # 사용자가 제공한 ID가 없으므로 일단 Input 필드로 받거나, 기본값을 상수로 둠.
-                            # 편의를 위해 여기서 바로 입력받도록 기획 변경 (전역 설정이 더 좋지만 급한대로)
+                            # Folder ID Settings (Hidden)
                             # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
-                            default_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
-                            drive_folder_id = st.text_input("Google Drive Folder ID", value=default_folder_id, key=f"fid_{oid}", help="업로드할 구글 드라이브 폴더의 ID를 입력하세요.", type="password")
+                            drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             
-                            use_camera = st.checkbox("📸 거래명세서 사진 첨부 (Attach Photo)", key=f"use_cam_{oid}")
-                            img_file = None
-                            if use_camera:
+                            # Clean UI: Use Expander for Camera to prevent auto-load permission request
+                            with st.expander("📸 거래명세서 촬영 (Open Camera)", expanded=False):
                                 img_file = st.camera_input("Take a picture", key=f"cam_{oid}")
+                            
+                            # Checkbox logic removed as Expander serves the purpose of "hiding" it initially
                             
                             if st.button("📥 Confirm Receipt & Upload (입고 확정 및 업로드)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
@@ -1054,7 +1049,11 @@ with tab3:
                                 st.success("Received successfully with updated quantities! (재고 반영 완료)")
                                 
                                 # 4. Google Drive Upload Logic
-                                if img_file:
+                                # img_file variable scope is valid because it is defined in the expander block above
+                                # Ideally initialize it to None before expander if we want to be strictly safe, 
+                                # but in Streamlit script runs, if the expander was not entered, img_file might not be defined if we didn't init it.
+                                # Let's fix the safety in this block.
+                                if 'img_file' in locals() and img_file is not None:
                                     if drive_folder_id:
                                         # File name format: YYYYMMDD_Branch_Vendor.jpg
                                         file_name = f"{o_date.replace('-','')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
