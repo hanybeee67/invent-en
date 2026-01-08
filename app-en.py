@@ -995,10 +995,9 @@ with tab3:
                             # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
                             drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             
-                            # Clean UI: Use File Uploader instead of Camera Input for better mobile stability
-                            # Mobile browsers often loop permission requests with live camera widgets.
-                            # File Uploader allows "Take Photo" via the OS native picker.
-                            img_file = st.file_uploader("📸 거래명세서 사진 첨부 (촬영 또는 앨범)", type=['png', 'jpg', 'jpeg'], key=f"u_img_{oid}")
+                            # Restore: Use st.camera_input as requested by user.
+                            # To minimize permission loops, we avoid re-rendering this component unnecessarily.
+                            img_file = st.camera_input("📸 거래명세서 촬영 (Take Photo)", key=f"cam_{oid}")
                             
                             if st.button("📥 Confirm Receipt & Upload (입고 확정 및 업로드)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
@@ -1048,25 +1047,27 @@ with tab3:
                                 st.success("Received successfully with updated quantities! (재고 반영 완료)")
                                 
                                 # 4. Google Drive Upload Logic
-                                # img_file variable scope is valid because it is defined in the expander block above
-                                # Ideally initialize it to None before expander if we want to be strictly safe, 
-                                # but in Streamlit script runs, if the expander was not entered, img_file might not be defined if we didn't init it.
-                                # Let's fix the safety in this block.
-                                if 'img_file' in locals() and img_file is not None:
+                                # Ensure img_file exists
+                                if img_file is not None:
                                     if drive_folder_id:
-                                        # File name format: YYYYMMDD_Branch_Vendor.jpg
-                                        file_name = f"{o_date.replace('-','')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
-                                        file_id = upload_file_to_drive(img_file, file_name, drive_folder_id)
+                                        with st.spinner("☁️ 구글 드라이브에 명세서를 업로드 중입니다... (Uploading...)"):
+                                            # File name format: YYYYMMDD_Branch_Vendor.jpg
+                                            file_name = f"{o_date.replace('-','')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
+                                            
+                                            # Rewind file pointer just in case
+                                            img_file.seek(0)
+                                            
+                                            file_id = upload_file_to_drive(img_file, file_name, drive_folder_id)
                                         
                                         if file_id:
-                                            st.toast(f"✅ Photo uploaded to Drive! (ID: {file_id})", icon="☁️")
-                                            st.write(f"✅ 거래명세서 업로드 완료: `{file_name}`")
+                                            st.toast(f"✅ 명세서 업로드 완료! (ID: {file_id})", icon="☁️")
+                                            st.write(f"✅ 거래명세서 업로드 성공: `{file_name}`")
                                         else:
-                                            st.error("❌ Failed to upload photo to Drive. Check logs.")
+                                            st.error("❌ 업로드 실패 (Upload Failed). 구글 드라이브 폴더 권한을 확인해주세요.")
                                     else:
-                                        st.warning("⚠️ Folder ID is missing. Photo was NOT uploaded. (폴더 ID를 입력해주세요)")
+                                        st.warning("⚠️ Folder ID is missing. (폴더 ID가 없습니다)")
                                 else:
-                                    st.info("ℹ️ No photo taken. Skipping upload.")
+                                    st.info("ℹ️ 사진이 촬영되지 않았습니다. (No photo taken)")
 
                                 import time
                                 time.sleep(2) # 결과 확인을 위한 딜레이
