@@ -995,11 +995,10 @@ with tab3:
                             # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
                             drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             
-                            # Clean UI: Use Expander for Camera to prevent auto-load permission request
-                            with st.expander("📸 거래명세서 촬영 (Open Camera)", expanded=False):
-                                img_file = st.camera_input("Take a picture", key=f"cam_{oid}")
-                            
-                            # Checkbox logic removed as Expander serves the purpose of "hiding" it initially
+                            # Clean UI: Use File Uploader instead of Camera Input for better mobile stability
+                            # Mobile browsers often loop permission requests with live camera widgets.
+                            # File Uploader allows "Take Photo" via the OS native picker.
+                            img_file = st.file_uploader("📸 거래명세서 사진 첨부 (촬영 또는 앨범)", type=['png', 'jpg', 'jpeg'], key=f"u_img_{oid}")
                             
                             if st.button("📥 Confirm Receipt & Upload (입고 확정 및 업로드)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
