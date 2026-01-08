@@ -1001,7 +1001,10 @@ with tab3:
                             default_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             drive_folder_id = st.text_input("Google Drive Folder ID", value=default_folder_id, key=f"fid_{oid}", help="업로드할 구글 드라이브 폴더의 ID를 입력하세요.", type="password")
                             
-                            img_file = st.camera_input("Take a picture", key=f"cam_{oid}")
+                            use_camera = st.checkbox("📸 거래명세서 사진 첨부 (Attach Photo)", key=f"use_cam_{oid}")
+                            img_file = None
+                            if use_camera:
+                                img_file = st.camera_input("Take a picture", key=f"cam_{oid}")
                             
                             if st.button("📥 Confirm Receipt & Upload (입고 확정 및 업로드)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
