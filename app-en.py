@@ -850,15 +850,32 @@ with tab3:
                     st.write("---")
                     items_str = ", ".join(final_items_list)
                     
-                    # SMS Body Construction
-                    sms_body = f"[Everest 구매요청]\n날짜: {p_date}\n지점: {p_branch}\n\n{items_str}"
+                    # SMS Body Construction (Improved)
+                    sms_body_lines = [
+                        f"[Everest 구매요청]",
+                        f"📅 날짜: {p_date}",
+                        f"🏢 지점: {p_branch}",
+                        "",
+                        "✅ 주문 품목:"
+                    ]
+                    for item in data['items']:
+                        sms_body_lines.append(f"- {item['item']} ({item['qty']}{item['unit']})")
+                    sms_body_lines.append("")
+                    sms_body_lines.append("확인 부탁드립니다.")
+
+                    sms_body_final = "\n".join(sms_body_lines)
+                    
+                    # Display Copyable Text Area
+                    st.text_area("📋 Copy Message (메시지 복사)", value=sms_body_final, height=150, key=f"sms_text_{v_name}")
+
+                    # SMS Link Gen
                     import urllib.parse
-                    encoded_body = urllib.parse.quote(sms_body)
+                    encoded_body = urllib.parse.quote(sms_body_final)
                     sms_link = f"sms:{data['phone']}?body={encoded_body}"
                     
                     # --- Consolidated Button (SMS + Save) ---
                     # Try to save and open SMS app with one button (using meta tag)
-                    if st.button(f"📲 Send SMS & Save Order (저장 및 문자발송)", key=f"btn_process_{v_name}", use_container_width=True):
+                    if st.button(f"📲 Save & Open SMS App ({v_name})", key=f"btn_process_{v_name}", use_container_width=True):
                         # 1. Save Logic
                         import uuid
                         import json
@@ -885,7 +902,7 @@ with tab3:
                         st.markdown(f'<meta http-equiv="refresh" content="0; url={sms_link}">', unsafe_allow_html=True)
                         
                         # Fallback Link (In case auto-open fails)
-                        st.markdown(f"If SMS doesn't open? 👉 [Click to Send SMS]({sms_link})")
+                        st.markdown(f"If SMS doesn't open? 👉 [Clck to Send SMS]({sms_link})")
 
 
             # --- Global Bulk Action ---
@@ -921,24 +938,31 @@ with tab3:
                 
                 # Show Links for each vendor
                 for v_name_g in saved_vendors:
-                    # Reconstruct SMS body
                     data_g = vendor_groups[v_name_g]
-                    # items_str logic
-                    f_list = [f"{item['item']} {item['qty']}{item['unit']}" for item in data_g["items"]]
-                    i_str = ", ".join(f_list)
                     
-                    s_body = f"[Everest 구매요청]\n날짜: {p_date}\n지점: {p_branch}\n\n{i_str}"
+                    # Reconstruct SMS body
+                    s_lines = [
+                        f"[Everest 구매요청]",
+                        f"📅 {p_date} | {p_branch}",
+                        ""
+                    ]
+                    for item in data_g['items']:
+                        s_lines.append(f"- {item['item']} {item['qty']}{item['unit']}")
+                    
+                    s_body = "\n".join(s_lines)
                     enc_body = urllib.parse.quote(s_body)
                     s_link = f"sms:{data_g['phone']}?body={enc_body}"
                     
-                    st.markdown(f'''
-                        <a href="{s_link}" target="_blank" style="
-                            text-decoration: none; color: white;
-                            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
-                            padding: 12px 20px; border-radius: 8px;
-                            display: block; font-weight: 600; text-align: center; margin-bottom: 10px;
-                        ">📲 Send SMS to {v_name_g} ({data_g['phone']})</a>
-                    ''', unsafe_allow_html=True)
+                    with st.expander(f"📲 Message for {v_name_g}", expanded=True):
+                        st.code(s_body, language='text')
+                        st.markdown(f'''
+                            <a href="{s_link}" target="_blank" style="
+                                text-decoration: none; color: white;
+                                background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+                                padding: 12px 20px; border-radius: 8px;
+                                display: block; font-weight: 600; text-align: center; margin-bottom: 10px;
+                            ">📲 Disable SMS App & Send ({data_g['phone']})</a>
+                        ''', unsafe_allow_html=True)
 
             # ==========================================
             # 3. Order Status & Receiving (Pending Orders)
@@ -995,9 +1019,10 @@ with tab3:
                             # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
                             drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             
-                            # Restore: Use st.camera_input as requested by user.
-                            # To minimize permission loops, we avoid re-rendering this component unnecessarily.
-                            img_file = st.camera_input("📸 Take a photo of the receipt (거래명세서 촬영)", key=f"cam_{oid}")
+                            # [Update] Use File Uploader instead of Camera Input to avoid permission loops
+                            # On mobile, this will offer "Take Photo" or "Photo Library" options.
+                            st.info("💡 Tip: Click 'Browse files' below -> Select 'Camera' to take a photo.")
+                            img_file = st.file_uploader("📸 Upload Receipt (명세서 촬영/업로드)", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
                             
                             if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
