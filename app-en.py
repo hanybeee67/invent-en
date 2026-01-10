@@ -1019,17 +1019,12 @@ with tab3:
                             # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
                             drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             
-                            # [Update] Hybrid Approach: Toggle between File Uploader and Camera Input
-                            # Default is File Uploader to avoid permission loops.
-                            use_cam_widget = st.toggle("📸 Use In-App Camera (앱 내 카메라 켜기)", value=False, key=f"toggle_cam_{oid}")
+                            # [Update] Camera Input causes infinite loops on user's device.
+                            # Reverting to File Uploader with Clear Instructions.
+                            # The user's device (Samsung) might hide the camera option in the file picker.
+                            st.info("ℹ️ **사진 찍는 법**: 아래 'Browse files' 버튼 클릭 → **'카메라' 아이콘** 또는 **'옵션(점 3개)'** 메뉴를 찾아보세요.")
                             
-                            img_file = None
-                            if use_cam_widget:
-                                st.info("ℹ️ If the camera doesn't appear, check browser permissions.")
-                                img_file = st.camera_input("📸 Take Photo directly", key=f"cam_widget_{oid}")
-                            else:
-                                st.info("💡 Tip: Click 'Browse files' -> Select 'Camera' (if available) or 'Gallery'.")
-                                img_file = st.file_uploader("📂 Upload Receipt Image", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
+                            img_file = st.file_uploader("📸 Upload Receipt (명세서 촬영/업로드)", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
                             
                             if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
