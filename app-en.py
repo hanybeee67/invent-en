@@ -227,11 +227,14 @@ html, body, [class*="css"] {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     margin: 0;
+    word-break: keep-all; /* Prevent awkward breaks */
+    white-space: nowrap; /* Keep on one line if possible */
 }
 .subtitle-text {
     font-size: 0.8rem; /* Smaller subtitle */
     color: #94a3b8;
     margin-top: 2px;
+    word-break: keep-all;
 }
 
 /* 3. Card & Metrics */
@@ -850,28 +853,32 @@ with tab3:
                     items_str = ", ".join(final_items_list)
                     
                     # SMS Body Construction
-                    sms_body = f"[Everest 구매요청]\n날짜: {p_date}\n지점: {p_branch}\n\n{items_str}"
+                    sms_body_lines = [
+                        f"[Everest 구매요청]",
+                        f"📅 {p_date}",
+                        f"🏢 {p_branch}",
+                        "",
+                        "✅ 주문 품목:"
+                    ]
+                    for item_data in data["items"]:
+                         sms_body_lines.append(f"- {item_data['item']} ({item_data['qty']}{item_data['unit']})")
+                    sms_body_lines.append("")
+                    sms_body_lines.append("확인 부탁드립니다.")
+
+                    sms_body_final = "\n".join(sms_body_lines)
+                    
+                    # SMS Link Gen
                     import urllib.parse
-                    encoded_body = urllib.parse.quote(sms_body)
+                    encoded_body = urllib.parse.quote(sms_body_final)
                     sms_link = f"sms:{data['phone']}?body={encoded_body}"
                     
-                    col_btn1, col_btn2 = st.columns(2)
-                    with col_btn1:
-                        st.markdown(f'''
-                            <a href="{sms_link}" target="_blank" style="
-                                text-decoration: none; color: white;
-                                background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-                                padding: 10px 20px; border-radius: 8px;
-                                display: inline-block; font-weight: 600; width: 100%; text-align: center;
-                            ">📲 Send SMS (문자발송)</a>
-                        ''', unsafe_allow_html=True)
-                    with col_btn2:
-                        if st.button(f"📋 Copy Message", key=f"copy_{v_name}"):
-                            st.code(sms_body)
-                            st.success("복사 완료!")
+                    # Display Copy Area
+                    with st.expander("📋 Review Message (메시지 미리보기)", expanded=False):
+                         st.text_area("Copy Text", value=sms_body_final, height=150, key=f"sms_txt_{v_name}")
 
-                    # --- Save Order Feature ---
-                    if st.button(f"💾 Save Order Record (발주 기록 저장)", key=f"save_order_{v_name}", use_container_width=True):
+                    # --- Consolidated: Save & Send SMS ---
+                    if st.button(f"📲 Save & Send SMS (저장 및 문자보내기)", key=f"save_send_{v_name}", type="primary", use_container_width=True):
+                        # 1. Save Order Logic
                         import uuid
                         import json
                         
@@ -890,7 +897,15 @@ with tab3:
                         new_row_df = pd.DataFrame([new_order])
                         orders_df = pd.concat([orders_df, new_row_df], ignore_index=True)
                         save_orders(orders_df)
-                        st.success(f"Order for {v_name} saved as Pending!")
+                        
+                        st.toast(f"✅ Order Saved! Opening SMS...", icon="📨")
+                        
+                        # 2. Trigger SMS using HTML meta refresh (Instant Redirect to App)
+                        st.markdown(f'<meta http-equiv="refresh" content="0; url={sms_link}">', unsafe_allow_html=True)
+                        
+                        # Fallback link
+                        st.markdown(f"**Click below if SMS app didn't open:**")
+                        st.markdown(f'<a href="{sms_link}" target="_blank" style="background:#10b981;color:white;padding:8px 12px;border-radius:5px;text-decoration:none;">📲 Open SMS App</a>', unsafe_allow_html=True)
                     # --------------------------
 
             # ==========================================
@@ -944,7 +959,10 @@ with tab3:
                                 num_rows="fixed"
                             )
                             
-                            if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
+                            
+                            # 1. Confirm Receipt Button (First)
+                            if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}", type="primary", use_container_width=True):
+                                # ... existing logic ...
                                 # 1. Update Inventory & History based on EDITED df
                                 inv_df = st.session_state.inventory.copy()
                                 hist_df = st.session_state.history.copy()
@@ -989,8 +1007,59 @@ with tab3:
                                 save_history(hist_df)
                                 save_orders(orders_df)
                                 
-                                st.success("Received successfully with updated quantities! Inventory updated.")
-                                st.rerun()
+                                st.balloons()
+                                st.success("✅ 입고가 확정되었습니다! (Inventory Updated)")
+                                # Don't rerun immediately to let them see the button below, or Rerun to refresh status?
+                                # Rerun is better to move it to 'Completed' list, but then they canmt upload photo.
+                                # User wanted flow: Confirm -> Send Photo.
+                                # If status becomes 'Completed', it disappears from this list!
+                                # Logic change: Use st.rerun() but maybe specific logic needed?
+                                # Actually, if it moves to 'Completed', access to upload might be lost.
+                                # Suggestion: Keep status 'Pending' until photo? Or allow photo upload even if completed?
+                                # Simpler: Update, keep status Pending? No, that confuses stock.
+                                # Let's keep existing logic: Rerun moves it to Completed.
+                                # User needs to upload photo *before* confirm? Or *After*?
+                                # Request: "button below Confirm Receipt... press button -> take picture -> send"
+                                # If Confirm removes the item from view, they can't see the button below.
+                                # Compromise: Don't rerun immediately, or keep it visible?
+                                # Or: Add Photo Upload *on the completed item*? 
+                                # Better: Add Photo Upload here. User should upload photo *then* confirm, OR confirm *then* upload.
+                                # If Confirm reruns, UI disappears. 
+                                # Let's Remove st.rerun() temporarily or warn user.
+                                st.info("👇 **잊지 말고 아래 버튼을 눌러 거래명세서를 전송하세요! (Please Upload Receipt)**")
+                            
+                            # 2. Transaction Receipt Upload (Separate)
+                            st.write("---")
+                            st.markdown("##### 📸 Send Transaction Statement (거래명세서 전송)")
+                            
+                            # Inject JS to enforce camera only when this specific uploader is clicked? 
+                            # Global injection covers all file inputs.
+                            
+                            # Drive Settings
+                            drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
+                            
+                            img_file = st.file_uploader(f"📸 Click here to Take Photo (명세서 촬영)", type=['png', 'jpg', 'jpeg'], key=f"rec_up_{oid}")
+                            
+                            if img_file is not None:
+                                # Auto Upload Logic
+                                if drive_folder_id:
+                                    # Avoid re-uploading loops
+                                    if f"uploaded_{oid}" not in st.session_state:
+                                        with st.spinner("☁️ Uploading to Base (본사 전송 중)..."):
+                                            from drive_utils import upload_file_to_drive
+                                            # Filename: Date_Branch_Vendor.jpg
+                                            file_name = f"{o_date.replace('-', '')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
+                                            img_file.seek(0)
+                                            f_id = upload_file_to_drive(img_file, file_name, drive_folder_id)
+                                            if f_id:
+                                                st.session_state[f"uploaded_{oid}"] = True
+                                                st.success(f"✅ 전송 완료! (Sent to HQ)")
+                                            else:
+                                                st.error("❌ 전송 실패 (Upload Failed)")
+                                    else:
+                                        st.success("✅ 이미 전송된 명세서입니다.")
+                                else:
+                                    st.warning("⚠️ Folder ID missing.")
 
             # --- Completed Orders View ---
             st.markdown("---")
