@@ -995,8 +995,9 @@ with tab3:
                             # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
                             drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             
-                            # Camera input removed to fix infinite permission loop
-                            # img_file = st.camera_input("📸 거래명세서 촬영 (Take Photo)", key=f"cam_{oid}")
+                            # Restore: Use st.camera_input as requested by user.
+                            # To minimize permission loops, we avoid re-rendering this component unnecessarily.
+                            img_file = st.camera_input("📸 Take a photo of the receipt (거래명세서 촬영)", key=f"cam_{oid}")
                             
                             if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
@@ -1045,6 +1046,30 @@ with tab3:
                                 
                                 st.success("Received successfully with updated quantities! (Inventory Updated)")
                                 
+                                # 4. Google Drive Upload Logic
+                                # Ensure img_file exists
+                                if img_file is not None:
+                                    if drive_folder_id:
+                                        with st.spinner("☁️ Uploading receipt to Google Drive..."):
+                                            from drive_utils import upload_file_to_drive
+                                            # File name format: YYYYMMDD_Branch_Vendor.jpg
+                                            file_name = f"{o_date.replace('-','')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
+                                            
+                                            # Rewind file pointer just in case
+                                            img_file.seek(0)
+                                            
+                                            file_id = upload_file_to_drive(img_file, file_name, drive_folder_id)
+                                        
+                                        if file_id:
+                                            st.toast(f"✅ Receipt Uploaded! (ID: {file_id})", icon="☁️")
+                                            st.write(f"✅ Upload Success: `{file_name}`")
+                                        else:
+                                            st.error("❌ Upload Failed. Check Folder ID/Permissions.")
+                                    else:
+                                        st.warning("⚠️ Folder ID is missing.")
+                                else:
+                                    st.info("ℹ️ No photo taken. Skipping upload.")
+
                                 import time
                                 time.sleep(1) # 결과 확인을 위한 딜레이
                                 st.rerun()
