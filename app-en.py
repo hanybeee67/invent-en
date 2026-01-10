@@ -712,7 +712,7 @@ with tab2:
 # ======================================================
 with tab3:
     st.subheader("🛒 Item Purchase (품목 구매)")
-    st.info("구매할 품목의 수량을 입력하면 구매처별로 정리하여 문자를 보낼 수 있습니다.")
+    st.info("Enter the quantity for items you wish to purchase. You can then copy the organized list to send via SMS.")
     
     vendor_map = load_vendor_mapping()
     all_items = load_item_db(PUR_DB)
@@ -754,7 +754,7 @@ with tab3:
 
             with r_col1:
                 if in_cart:
-                    st.markdown(f"**{item_info['item']}** ({item_info['unit']}) <span style='color:#4ade80; font-weight:bold; background:#064e3b; padding:2px 6px; border-radius:4px;'>✅ 담김 ({cart_qty})</span>", unsafe_allow_html=True)
+                    st.markdown(f"**{item_info['item']}** ({item_info['unit']}) <span style='color:#4ade80; font-weight:bold; background:#064e3b; padding:2px 6px; border-radius:4px;'>✅ Added ({cart_qty})</span>", unsafe_allow_html=True)
                 else:
                     st.write(f"**{item_info['item']}** ({item_info['unit']})")
             
@@ -791,7 +791,7 @@ with tab3:
         active_cart = {k: v for k, v in st.session_state.purchase_cart.items() if v > 0}
         
         if not active_cart:
-            st.warning("선택된 품목이 없습니다.")
+            st.warning("No items selected.")
         else:
             if st.button("🗑 Clear All (전체 삭제)", key="clear_all_summary", type="primary", use_container_width=True):
                 st.session_state.purchase_cart = {}
@@ -811,8 +811,8 @@ with tab3:
                 
                 # 3. 그래도 없으면 미지정
                 if not v_info:
-                    # 매핑 정보가 없을 경우, 디버깅을 위해 카테고리를 함께표시
-                    v_name = f"미지정 (Unknown) - {cat}"
+                    # If mapping missing, display category for debugging
+                    v_name = f"Unknown (미지정) - {cat}"
                     v_phone = ""
                 else:
                     v_name = v_info["vendor"]
@@ -857,7 +857,7 @@ with tab3:
                     sms_link = f"sms:{data['phone']}?body={encoded_body}"
                     
                     # --- Consolidated Button (SMS + Save) ---
-                    # 하나의 버튼으로 저장과 동시에 SMS 앱을 열도록 시도(메타 태그 활용)
+                    # Try to save and open SMS app with one button (using meta tag)
                     if st.button(f"📲 Send SMS & Save Order (저장 및 문자발송)", key=f"btn_process_{v_name}", use_container_width=True):
                         # 1. Save Logic
                         import uuid
@@ -879,13 +879,13 @@ with tab3:
                         save_orders(orders_df)
                         
                         # 2. Trigger SMS Open
-                        st.success(f"✅ {v_name} 주문이 저장되었습니다! 문자 앱이 열립니다...")
+                        st.success(f"✅ Order for {v_name} saved! Opening SMS app...")
                         
                         # JavaScript / Meta refresh to open link
                         st.markdown(f'<meta http-equiv="refresh" content="0; url={sms_link}">', unsafe_allow_html=True)
                         
-                        # Fallback Link (혹시 자동 연결 안될 경우 대비)
-                        st.markdown(f"혹시 문자가 안 열리면? 👉 [문자 보내기 클릭]({sms_link})")
+                        # Fallback Link (In case auto-open fails)
+                        st.markdown(f"If SMS doesn't open? 👉 [Click to Send SMS]({sms_link})")
 
 
             # --- Global Bulk Action ---
@@ -915,9 +915,9 @@ with tab3:
                     saved_vendors.append(v_name_g)
                 
                 save_orders(orders_df)
-                st.success(f"✅ 총 {len(saved_vendors)}개 업체의 주문이 모두 'Pending' 상태로 저장되었습니다!")
+                st.success(f"✅ All orders for {len(saved_vendors)} vendors saved as 'Pending'!")
                 
-                st.markdown("#### 👇 아래 링크를 눌러 각 업체에 문자를 보내세요!")
+                st.markdown("#### 👇 Click links below to send SMS to each vendor!")
                 
                 # Show Links for each vendor
                 for v_name_g in saved_vendors:
@@ -937,7 +937,7 @@ with tab3:
                             background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
                             padding: 12px 20px; border-radius: 8px;
                             display: block; font-weight: 600; text-align: center; margin-bottom: 10px;
-                        ">📲 {v_name_g}에게 문자 보내기 ({data_g['phone']})</a>
+                        ">📲 Send SMS to {v_name_g} ({data_g['phone']})</a>
                     ''', unsafe_allow_html=True)
 
             # ==========================================
@@ -945,7 +945,7 @@ with tab3:
             # ==========================================
             st.markdown("---")
             st.subheader("3. Order Status (발주 현황 및 입고 처리)")
-            st.info("발주 후 도착한 물품을 확인하고 '입고 확정' 버튼을 누르면 재고에 자동 반영됩니다.")
+            st.info("Check arrived items and click 'Confirm Receipt' to update inventory automatically.")
             
             orders_df = load_orders()
             if not orders_df.empty:
@@ -953,7 +953,7 @@ with tab3:
                 pending_orders = orders_df[orders_df["Status"] == "Pending"].sort_values("CreatedDate", ascending=False)
                 
                 if pending_orders.empty:
-                    st.write("대기 중인 발주 내역이 없습니다.")
+                    st.write("No pending orders.")
                 else:
                     import json
                     for idx, row in pending_orders.iterrows():
@@ -977,7 +977,7 @@ with tab3:
                             # Reorder for display
                             p_items_df = p_items_df[["Category", "Item", "Qty", "Unit"]]
                             
-                            st.write("▼ 아래 표에서 실 수령 수량을 수정한 뒤 '입고 확정'을 누르세요.")
+                            st.write("▼ Edit actual received quantity below, then click 'Confirm Receipt'.")
                             edited_df = st.data_editor(
                                 p_items_df,
                                 column_config={
@@ -1043,7 +1043,7 @@ with tab3:
                                 save_history(hist_df)
                                 save_orders(orders_df)
                                 
-                                st.success("Received successfully with updated quantities! (재고 반영 완료)")
+                                st.success("Received successfully with updated quantities! (Inventory Updated)")
                                 
                                 import time
                                 time.sleep(1) # 결과 확인을 위한 딜레이
