@@ -1022,9 +1022,29 @@ with tab3:
                             # [Update] Camera Input causes infinite loops on user's device.
                             # Reverting to File Uploader with Clear Instructions.
                             # The user's device (Samsung) might hide the camera option in the file picker.
-                            st.info("ℹ️ **사진 찍는 법**: 아래 'Browse files' 버튼 클릭 → **'카메라' 아이콘** 또는 **'옵션(점 3개)'** 메뉴를 찾아보세요.")
+                            # [Updated] Injecting JS to force 'capture=environment' to open camera directly if possible.
                             
-                            img_file = st.file_uploader("📸 Upload Receipt (명세서 촬영/업로드)", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
+                            # JavaScript to enforce "Capture" attribute on the file input
+                            capture_js = """
+                            <script>
+                                try {
+                                    const observer = new MutationObserver((mutations) => {
+                                        const inputs = document.querySelectorAll('input[type="file"]');
+                                        inputs.forEach(input => {
+                                            if (!input.hasAttribute('capture')) {
+                                                input.setAttribute('accept', 'image/*');
+                                                input.setAttribute('capture', 'environment');
+                                            }
+                                        });
+                                    });
+                                    observer.observe(document.body, { childList: true, subtree: true });
+                                } catch(e) { console.log(e); }
+                            </script>
+                            """
+                            st.markdown(capture_js, unsafe_allow_html=True)
+                            
+                            st.info("ℹ️ **Tip**: 버튼을 누르면 카메라가 바로 열리도록 설정했습니다. (기기에 따라 다를 수 있음)")
+                            img_file = st.file_uploader("📸 Click to Take Photo (버튼을 눌러 촬영)", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
                             
                             if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
