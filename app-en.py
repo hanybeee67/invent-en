@@ -1019,10 +1019,17 @@ with tab3:
                             # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
                             drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
                             
-                            # [Update] Use File Uploader instead of Camera Input to avoid permission loops
-                            # On mobile, this will offer "Take Photo" or "Photo Library" options.
-                            st.info("💡 Tip: Click 'Browse files' below -> Select 'Camera' to take a photo.")
-                            img_file = st.file_uploader("📸 Upload Receipt (명세서 촬영/업로드)", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
+                            # [Update] Hybrid Approach: Toggle between File Uploader and Camera Input
+                            # Default is File Uploader to avoid permission loops.
+                            use_cam_widget = st.toggle("📸 Use In-App Camera (앱 내 카메라 켜기)", value=False, key=f"toggle_cam_{oid}")
+                            
+                            img_file = None
+                            if use_cam_widget:
+                                st.info("ℹ️ If the camera doesn't appear, check browser permissions.")
+                                img_file = st.camera_input("📸 Take Photo directly", key=f"cam_widget_{oid}")
+                            else:
+                                st.info("💡 Tip: Click 'Browse files' -> Select 'Camera' (if available) or 'Gallery'.")
+                                img_file = st.file_uploader("📂 Upload Receipt Image", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
                             
                             if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
