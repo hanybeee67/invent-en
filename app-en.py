@@ -3,7 +3,6 @@ import pandas as pd
 import os
 from datetime import date, datetime
 import io
-from drive_utils import upload_file_to_drive
 
 # ================= Page Config ==================
 st.set_page_config(
@@ -712,7 +711,7 @@ with tab2:
 # ======================================================
 with tab3:
     st.subheader("🛒 Item Purchase (품목 구매)")
-    st.info("Enter the quantity for items you wish to purchase. You can then copy the organized list to send via SMS.")
+    st.info("구매할 품목의 수량을 입력하면 구매처별로 정리하여 문자를 보낼 수 있습니다.")
     
     vendor_map = load_vendor_mapping()
     all_items = load_item_db(PUR_DB)
@@ -754,7 +753,7 @@ with tab3:
 
             with r_col1:
                 if in_cart:
-                    st.markdown(f"**{item_info['item']}** ({item_info['unit']}) <span style='color:#4ade80; font-weight:bold; background:#064e3b; padding:2px 6px; border-radius:4px;'>✅ Added ({cart_qty})</span>", unsafe_allow_html=True)
+                    st.markdown(f"**{item_info['item']}** ({item_info['unit']}) <span style='color:#4ade80; font-weight:bold; background:#064e3b; padding:2px 6px; border-radius:4px;'>✅ 담김 ({cart_qty})</span>", unsafe_allow_html=True)
                 else:
                     st.write(f"**{item_info['item']}** ({item_info['unit']})")
             
@@ -791,7 +790,7 @@ with tab3:
         active_cart = {k: v for k, v in st.session_state.purchase_cart.items() if v > 0}
         
         if not active_cart:
-            st.warning("No items selected.")
+            st.warning("선택된 품목이 없습니다.")
         else:
             if st.button("🗑 Clear All (전체 삭제)", key="clear_all_summary", type="primary", use_container_width=True):
                 st.session_state.purchase_cart = {}
@@ -811,8 +810,8 @@ with tab3:
                 
                 # 3. 그래도 없으면 미지정
                 if not v_info:
-                    # If mapping missing, display category for debugging
-                    v_name = f"Unknown (미지정) - {cat}"
+                    # 매핑 정보가 없을 경우, 디버깅을 위해 카테고리를 함께표시
+                    v_name = f"미지정 (Unknown) - {cat}"
                     v_phone = ""
                 else:
                     v_name = v_info["vendor"]
@@ -850,33 +849,29 @@ with tab3:
                     st.write("---")
                     items_str = ", ".join(final_items_list)
                     
-                    # SMS Body Construction (Improved)
-                    sms_body_lines = [
-                        f"[Everest 구매요청]",
-                        f"📅 날짜: {p_date}",
-                        f"🏢 지점: {p_branch}",
-                        "",
-                        "✅ 주문 품목:"
-                    ]
-                    for item in data['items']:
-                        sms_body_lines.append(f"- {item['item']} ({item['qty']}{item['unit']})")
-                    sms_body_lines.append("")
-                    sms_body_lines.append("확인 부탁드립니다.")
-
-                    sms_body_final = "\n".join(sms_body_lines)
-                    
-                    # Display Copyable Text Area
-                    st.text_area("📋 Copy Message (메시지 복사)", value=sms_body_final, height=150, key=f"sms_text_{v_name}")
-
-                    # SMS Link Gen
+                    # SMS Body Construction
+                    sms_body = f"[Everest 구매요청]\n날짜: {p_date}\n지점: {p_branch}\n\n{items_str}"
                     import urllib.parse
-                    encoded_body = urllib.parse.quote(sms_body_final)
+                    encoded_body = urllib.parse.quote(sms_body)
                     sms_link = f"sms:{data['phone']}?body={encoded_body}"
                     
-                    # --- Consolidated Button (SMS + Save) ---
-                    # Try to save and open SMS app with one button (using meta tag)
-                    if st.button(f"📲 Save & Open SMS App ({v_name})", key=f"btn_process_{v_name}", use_container_width=True):
-                        # 1. Save Logic
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        st.markdown(f'''
+                            <a href="{sms_link}" target="_blank" style="
+                                text-decoration: none; color: white;
+                                background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+                                padding: 10px 20px; border-radius: 8px;
+                                display: inline-block; font-weight: 600; width: 100%; text-align: center;
+                            ">📲 Send SMS (문자발송)</a>
+                        ''', unsafe_allow_html=True)
+                    with col_btn2:
+                        if st.button(f"📋 Copy Message", key=f"copy_{v_name}"):
+                            st.code(sms_body)
+                            st.success("복사 완료!")
+
+                    # --- Save Order Feature ---
+                    if st.button(f"💾 Save Order Record (발주 기록 저장)", key=f"save_order_{v_name}", use_container_width=True):
                         import uuid
                         import json
                         
@@ -891,85 +886,19 @@ with tab3:
                             "CreatedDate": str(datetime.now())
                         }
                         
+                        # pd.concat to add row
                         new_row_df = pd.DataFrame([new_order])
                         orders_df = pd.concat([orders_df, new_row_df], ignore_index=True)
                         save_orders(orders_df)
-                        
-                        # 2. Trigger SMS Open
-                        st.success(f"✅ Order for {v_name} saved! Opening SMS app...")
-                        
-                        # JavaScript / Meta refresh to open link
-                        st.markdown(f'<meta http-equiv="refresh" content="0; url={sms_link}">', unsafe_allow_html=True)
-                        
-                        # Fallback Link (In case auto-open fails)
-                        st.markdown(f"If SMS doesn't open? 👉 [Clck to Send SMS]({sms_link})")
-
-
-            # --- Global Bulk Action ---
-            st.markdown("---")
-            st.markdown("### 🚀 Batch Process (전체 발주 저장)")
-            
-            if st.button("🚀 Save ALL Orders & Show SMS Links (전체 저장 및 문자보내기)", key="save_all_global", type="primary", use_container_width=True):
-                import uuid
-                import json
-                
-                orders_df = load_orders()
-                saved_vendors = []
-                
-                # Iterate all vendors in cart
-                for v_name_g, data_g in vendor_groups.items():
-                    # Create Order Record
-                    new_order_g = {
-                        "OrderId": str(uuid.uuid4()),
-                        "Date": str(p_date),
-                        "Branch": p_branch,
-                        "Vendor": v_name_g,
-                        "Items": json.dumps(data_g["items"], ensure_ascii=False),
-                        "Status": "Pending",
-                        "CreatedDate": str(datetime.now())
-                    }
-                    orders_df = pd.concat([orders_df, pd.DataFrame([new_order_g])], ignore_index=True)
-                    saved_vendors.append(v_name_g)
-                
-                save_orders(orders_df)
-                st.success(f"✅ All orders for {len(saved_vendors)} vendors saved as 'Pending'!")
-                
-                st.markdown("#### 👇 Click links below to send SMS to each vendor!")
-                
-                # Show Links for each vendor
-                for v_name_g in saved_vendors:
-                    data_g = vendor_groups[v_name_g]
-                    
-                    # Reconstruct SMS body
-                    s_lines = [
-                        f"[Everest 구매요청]",
-                        f"📅 {p_date} | {p_branch}",
-                        ""
-                    ]
-                    for item in data_g['items']:
-                        s_lines.append(f"- {item['item']} {item['qty']}{item['unit']}")
-                    
-                    s_body = "\n".join(s_lines)
-                    enc_body = urllib.parse.quote(s_body)
-                    s_link = f"sms:{data_g['phone']}?body={enc_body}"
-                    
-                    with st.expander(f"📲 Message for {v_name_g}", expanded=True):
-                        st.code(s_body, language='text')
-                        st.markdown(f'''
-                            <a href="{s_link}" target="_blank" style="
-                                text-decoration: none; color: white;
-                                background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
-                                padding: 12px 20px; border-radius: 8px;
-                                display: block; font-weight: 600; text-align: center; margin-bottom: 10px;
-                            ">📲 Disable SMS App & Send ({data_g['phone']})</a>
-                        ''', unsafe_allow_html=True)
+                        st.success(f"Order for {v_name} saved as Pending!")
+                    # --------------------------
 
             # ==========================================
             # 3. Order Status & Receiving (Pending Orders)
             # ==========================================
             st.markdown("---")
             st.subheader("3. Order Status (발주 현황 및 입고 처리)")
-            st.info("Check arrived items and click 'Confirm Receipt' to update inventory automatically.")
+            st.info("발주 후 도착한 물품을 확인하고 '입고 확정' 버튼을 누르면 재고에 자동 반영됩니다.")
             
             orders_df = load_orders()
             if not orders_df.empty:
@@ -977,7 +906,7 @@ with tab3:
                 pending_orders = orders_df[orders_df["Status"] == "Pending"].sort_values("CreatedDate", ascending=False)
                 
                 if pending_orders.empty:
-                    st.write("No pending orders.")
+                    st.write("대기 중인 발주 내역이 없습니다.")
                 else:
                     import json
                     for idx, row in pending_orders.iterrows():
@@ -1001,7 +930,7 @@ with tab3:
                             # Reorder for display
                             p_items_df = p_items_df[["Category", "Item", "Qty", "Unit"]]
                             
-                            st.write("▼ Edit actual received quantity below, then click 'Confirm Receipt'.")
+                            st.write("▼ 아래 표에서 실 수령 수량을 수정한 뒤 '입고 확정'을 누르세요.")
                             edited_df = st.data_editor(
                                 p_items_df,
                                 column_config={
@@ -1014,37 +943,6 @@ with tab3:
                                 key=f"editor_{oid}",
                                 num_rows="fixed"
                             )
-                            
-                            # Folder ID Settings (Hidden)
-                            # [Update] User provided ID: 19cR812tCci2hma8vpYRpReC70vzFxSe3
-                            drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
-                            
-                            # [Update] Camera Input causes infinite loops on user's device.
-                            # Reverting to File Uploader with Clear Instructions.
-                            # The user's device (Samsung) might hide the camera option in the file picker.
-                            # [Updated] Injecting JS to force 'capture=environment' to open camera directly if possible.
-                            
-                            # JavaScript to enforce "Capture" attribute on the file input
-                            capture_js = """
-                            <script>
-                                try {
-                                    const observer = new MutationObserver((mutations) => {
-                                        const inputs = document.querySelectorAll('input[type="file"]');
-                                        inputs.forEach(input => {
-                                            if (!input.hasAttribute('capture')) {
-                                                input.setAttribute('accept', 'image/*');
-                                                input.setAttribute('capture', 'environment');
-                                            }
-                                        });
-                                    });
-                                    observer.observe(document.body, { childList: true, subtree: true });
-                                } catch(e) { console.log(e); }
-                            </script>
-                            """
-                            st.markdown(capture_js, unsafe_allow_html=True)
-                            
-                            st.info("ℹ️ **Tip**: 버튼을 누르면 카메라가 바로 열리도록 설정했습니다. (기기에 따라 다를 수 있음)")
-                            img_file = st.file_uploader("📸 Click to Take Photo (버튼을 눌러 촬영)", type=['png', 'jpg', 'jpeg'], key=f"uplo_{oid}")
                             
                             if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}"):
                                 # 1. Update Inventory & History based on EDITED df
@@ -1091,34 +989,7 @@ with tab3:
                                 save_history(hist_df)
                                 save_orders(orders_df)
                                 
-                                st.success("Received successfully with updated quantities! (Inventory Updated)")
-                                
-                                # 4. Google Drive Upload Logic
-                                # Ensure img_file exists
-                                if img_file is not None:
-                                    if drive_folder_id:
-                                        with st.spinner("☁️ Uploading receipt to Google Drive..."):
-                                            from drive_utils import upload_file_to_drive
-                                            # File name format: YYYYMMDD_Branch_Vendor.jpg
-                                            file_name = f"{o_date.replace('-','')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
-                                            
-                                            # Rewind file pointer just in case
-                                            img_file.seek(0)
-                                            
-                                            file_id = upload_file_to_drive(img_file, file_name, drive_folder_id)
-                                        
-                                        if file_id:
-                                            st.toast(f"✅ Receipt Uploaded! (ID: {file_id})", icon="☁️")
-                                            st.write(f"✅ Upload Success: `{file_name}`")
-                                        else:
-                                            st.error("❌ Upload Failed. Check Folder ID/Permissions.")
-                                    else:
-                                        st.warning("⚠️ Folder ID is missing.")
-                                else:
-                                    st.info("ℹ️ No photo taken. Skipping upload.")
-
-                                import time
-                                time.sleep(1) # 결과 확인을 위한 딜레이
+                                st.success("Received successfully with updated quantities! Inventory updated.")
                                 st.rerun()
 
             # --- Completed Orders View ---
