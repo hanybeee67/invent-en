@@ -5,7 +5,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 # Scopes required for Drive API
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+# 'drive.file' only allows access to files created by the app. 
+# We need 'drive' scope to access folders shared by the user.
+SCOPES = ['https://www.googleapis.com/auth/drive']
 
 # Service Account Key File
 SERVICE_ACCOUNT_FILE = 'google_keys.json'
