@@ -507,9 +507,9 @@ with col_h2:
     h_col1, h_col2 = st.columns([8, 2])
     with h_col1:
         st.markdown(f"""
-        <div style="display: flex; align-items: baseline; gap: 15px;">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;">
             <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">Everest Inventory</h1>
-            <p class="subtitle-text" style="margin: 0;">Professional Stock Management System</p>
+            <p class="subtitle-text" style="margin: 0; white-space: normal;">Professional Stock Management System</p>
             <span style="font-size: 0.8rem; background: #334155; padding: 2px 8px; border-radius: 4px; color: #94a3b8;">{storage_mode}</span>
         </div>
         """, unsafe_allow_html=True)
