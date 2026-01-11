@@ -372,6 +372,7 @@ if __name__ == "__main__":
     # Render provides PORT env var. Flet needs to bind to 0.0.0.0 for external access.
     # When deployed, view must be WEB_BROWSER (or just running as server).
     import os
+    print("🚀 Starting Flet App on Render...")
     SERVER_PORT = int(os.environ.get("PORT", 8550))
     ft.app(
         target=main, 
