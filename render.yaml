@@ -4,7 +4,7 @@ services:
     env: python
     plan: starter # 디스크 사용을 위해 Starter 플랜 필수
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run app-en.py --server.port $PORT --server.address 0.0.0.0
+    startCommand: python main.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12

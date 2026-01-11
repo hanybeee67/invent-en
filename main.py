@@ -369,4 +369,13 @@ def main(page: ft.Page):
     page.add(t)
 
 if __name__ == "__main__":
-    ft.app(target=main, assets_dir="assets")
+    # Render provides PORT env var. Flet needs to bind to 0.0.0.0 for external access.
+    # When deployed, view must be WEB_BROWSER (or just running as server).
+    import os
+    SERVER_PORT = int(os.environ.get("PORT", 8550))
+    ft.app(
+        target=main, 
+        assets_dir="assets", 
+        view=ft.AppView.WEB_BROWSER, 
+        port=SERVER_PORT
+    )
