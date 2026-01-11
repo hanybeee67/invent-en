@@ -917,14 +917,21 @@ with tab3:
             
             orders_df = load_orders()
             if not orders_df.empty:
-                # Pending 상태인 것만 조회
-                pending_orders = orders_df[orders_df["Status"] == "Pending"].sort_values("CreatedDate", ascending=False)
+                # [Fix] Keep 'Completed' items visible if they were just confirmed, to allow photo upload.
+                if "freshly_confirmed" not in st.session_state:
+                    st.session_state.freshly_confirmed = []
                 
-                if pending_orders.empty:
+                # Filter: Pending OR (Completed AND in freshly_confirmed)
+                mask_pending = orders_df["Status"] == "Pending"
+                mask_fresh = orders_df["OrderId"].isin(st.session_state.freshly_confirmed)
+                
+                visible_orders = orders_df[mask_pending | mask_fresh].sort_values("CreatedDate", ascending=False)
+                
+                if visible_orders.empty:
                     st.write("대기 중인 발주 내역이 없습니다.")
                 else:
                     import json
-                    for idx, row in pending_orders.iterrows():
+                    for idx, row in visible_orders.iterrows():
                         oid = row["OrderId"]
                         o_date = row["Date"]
                         o_branch = row["Branch"]
@@ -961,72 +968,67 @@ with tab3:
                             
                             
                             # 1. Confirm Receipt Button (First)
-                            if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}", type="primary", use_container_width=True):
-                                # ... existing logic ...
-                                # 1. Update Inventory & History based on EDITED df
-                                inv_df = st.session_state.inventory.copy()
-                                hist_df = st.session_state.history.copy()
-                                
-                                # Convert back to list of dicts to save in order history
-                                final_items = []
-                                
-                                for _, e_row in edited_df.iterrows():
-                                    cat, i_name, qty, unit = e_row["Category"], e_row["Item"], float(e_row["Qty"]), e_row["Unit"]
+                            # If already confirmed (in freshly_confirmed or Status Completed), disable button or show State
+                            is_confirmed = (row["Status"] == "Completed")
+                            
+                            if is_confirmed:
+                                st.success("✅ 이미 입고 확정된 항목입니다. (Confirmed)")
+                            else:
+                                if st.button("📥 Confirm Receipt (입고 확정)", key=f"confirm_{oid}", type="primary", use_container_width=True):
+                                    # ... existing logic ...
+                                    # 1. Update Inventory & History based on EDITED df
+                                    inv_df = st.session_state.inventory.copy()
+                                    hist_df = st.session_state.history.copy()
                                     
-                                    # Update final items for record
-                                    final_items.append({"cat": cat, "item": i_name, "qty": qty, "unit": unit})
+                                    # Convert back to list of dicts to save in order history
+                                    final_items = []
                                     
-                                    if qty > 0:
-                                        # History Log
-                                        hist_df.loc[len(hist_df)] = [
-                                            str(date.today()), o_branch, cat, i_name, unit, "IN", qty
-                                        ]
+                                    for _, e_row in edited_df.iterrows():
+                                        cat, i_name, qty, unit = e_row["Category"], e_row["Item"], float(e_row["Qty"]), e_row["Unit"]
                                         
-                                        # Inventory Update
-                                        mask = (inv_df["Branch"] == o_branch) & (inv_df["Item"] == i_name) & (inv_df["Category"] == cat)
-                                        if mask.any():
-                                            current_qty = float(inv_df.loc[mask, "CurrentQty"].values[0])
-                                            inv_df.loc[mask, "CurrentQty"] = current_qty + qty
-                                        else:
-                                            # New Item entry
-                                            new_row = pd.DataFrame(
-                                                [[o_branch, i_name, cat, unit, qty, 0, "", str(date.today())]],
-                                                columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
-                                            )
-                                            inv_df = pd.concat([inv_df, new_row], ignore_index=True)
+                                        # Update final items for record
+                                        final_items.append({"cat": cat, "item": i_name, "qty": qty, "unit": unit})
+                                        
+                                        if qty > 0:
+                                            # History Log
+                                            hist_df.loc[len(hist_df)] = [
+                                                str(date.today()), o_branch, cat, i_name, unit, "IN", qty
+                                            ]
+                                            
+                                            # Inventory Update
+                                            mask = (inv_df["Branch"] == o_branch) & (inv_df["Item"] == i_name) & (inv_df["Category"] == cat)
+                                            if mask.any():
+                                                current_qty = float(inv_df.loc[mask, "CurrentQty"].values[0])
+                                                inv_df.loc[mask, "CurrentQty"] = current_qty + qty
+                                            else:
+                                                # New Item entry
+                                                new_row = pd.DataFrame(
+                                                    [[o_branch, i_name, cat, unit, qty, 0, "", str(date.today())]],
+                                                    columns=["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
+                                                )
+                                                inv_df = pd.concat([inv_df, new_row], ignore_index=True)
 
-                                # 2. Update Order Status & Received Items
-                                # Update the items content with the edited values so history shows actual received
-                                orders_df.loc[orders_df["OrderId"] == oid, "Items"] = json.dumps(final_items, ensure_ascii=False)
-                                orders_df.loc[orders_df["OrderId"] == oid, "Status"] = "Completed"
-                                
-                                # 3. Save All
-                                st.session_state.inventory = inv_df
-                                st.session_state.history = hist_df
-                                save_inventory(inv_df)
-                                save_history(hist_df)
-                                save_orders(orders_df)
-                                
-                                st.balloons()
-                                st.success("✅ 입고가 확정되었습니다! (Inventory Updated)")
-                                # Don't rerun immediately to let them see the button below, or Rerun to refresh status?
-                                # Rerun is better to move it to 'Completed' list, but then they canmt upload photo.
-                                # User wanted flow: Confirm -> Send Photo.
-                                # If status becomes 'Completed', it disappears from this list!
-                                # Logic change: Use st.rerun() but maybe specific logic needed?
-                                # Actually, if it moves to 'Completed', access to upload might be lost.
-                                # Suggestion: Keep status 'Pending' until photo? Or allow photo upload even if completed?
-                                # Simpler: Update, keep status Pending? No, that confuses stock.
-                                # Let's keep existing logic: Rerun moves it to Completed.
-                                # User needs to upload photo *before* confirm? Or *After*?
-                                # Request: "button below Confirm Receipt... press button -> take picture -> send"
-                                # If Confirm removes the item from view, they can't see the button below.
-                                # Compromise: Don't rerun immediately, or keep it visible?
-                                # Or: Add Photo Upload *on the completed item*? 
-                                # Better: Add Photo Upload here. User should upload photo *then* confirm, OR confirm *then* upload.
-                                # If Confirm reruns, UI disappears. 
-                                # Let's Remove st.rerun() temporarily or warn user.
-                                st.info("👇 **잊지 말고 아래 버튼을 눌러 거래명세서를 전송하세요! (Please Upload Receipt)**")
+                                    # 2. Update Order Status & Received Items
+                                    orders_df.loc[orders_df["OrderId"] == oid, "Items"] = json.dumps(final_items, ensure_ascii=False)
+                                    orders_df.loc[orders_df["OrderId"] == oid, "Status"] = "Completed"
+                                    
+                                    # 3. Save All
+                                    st.session_state.inventory = inv_df
+                                    st.session_state.history = hist_df
+                                    save_inventory(inv_df)
+                                    save_history(hist_df)
+                                    save_orders(orders_df)
+                                    
+                                    # [Fix] Add to freshly_confirmed so it stays visible for photo upload
+                                    st.session_state.freshly_confirmed.append(oid)
+                                    
+                                    st.balloons()
+                                    st.success("✅ 입고가 확정되었습니다! (Inventory Updated)")
+                                    
+                                    # Rerun to update UI (Disable button, Show success) BUT keep item visible due to filtered logic
+                                    st.rerun()
+                            
+                            st.info("👇 **잊지 말고 아래 버튼을 눌러 거래명세서를 전송하세요! (Please Upload Receipt)**")
                             
                             # 2. Transaction Receipt Upload (Separate)
                             st.write("---")
