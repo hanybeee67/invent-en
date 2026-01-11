@@ -1038,7 +1038,7 @@ with tab3:
                             # Global injection covers all file inputs.
                             
                             # Drive Settings
-                            drive_folder_id = "19cR812tCci2hma8vpYRpReC70vzFxSe3"
+                            drive_folder_id = "1go58wzFXi172SRRXJ0TGa71WKfyrwOi2"
                             
                             img_file = st.file_uploader(f"📸 Click here to Take Photo (명세서 촬영)", type=['png', 'jpg', 'jpeg'], key=f"rec_up_{oid}")
                             
