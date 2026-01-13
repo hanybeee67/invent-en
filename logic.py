@@ -72,6 +72,25 @@ def load_item_db(file_path):
         
     return items
 
+def save_item_db(file_path, items):
+    """
+    아이템 DB 저장 (items: list of dicts)
+    """
+    try:
+        # Convert list of dicts back to DataFrame
+        df = pd.DataFrame(items)
+        # Ensure column order matches standard if possible, otherwise just save
+        if not df.empty:
+            # Standardize columns for saving: Category, Item, Unit
+            # Map back to standard names if needed, or just save keys as headers
+            # keys are 'category', 'item', 'unit'
+            df = df[['category', 'item', 'unit']] 
+        
+        df.to_csv(file_path, index=False, encoding="utf-8-sig")
+        return True, "Success"
+    except Exception as e:
+        return False, str(e)
+
 def load_vendor_mapping():
     mapping = {}
     df = robust_read_csv(VENDOR_FILE)
