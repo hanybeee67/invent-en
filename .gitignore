@@ -1,23 +1,27 @@
-# Google Sheets API keys
-google_keys.json
-
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
 .venv
-venv/
-ENV/
+venv
+env
+
+# Google Service Account Keys
+*.json
+google_keys.json
+service_account.json
+client_secret.json
 
 # Streamlit
 .streamlit/
+!/.streamlit/config.toml
 
-# OS
-.DS_Store
-Thumbs.db
+# Data (If local only, keep structure but ignore content?)
+# User said "Keep data files", but usually we ignore local data if production uses Render disk.
+# However, user uses CSVs in repo. So we KEEP data csvs in git?
+# Wait, user said "data(csv ... preserve)".
+# If I gitignore them, they won't be pushed.
+# Let's NOT gitignore csvs unless user asked. The prompt said "Google keys... gitignore".
+# It didn't say gitignore csvs.
 
-# Data (Optional: if you don't want to push local csv backups)
-# inventory_data.csv
-# stock_history.csv
-# food ingredients.txt
+# Uploads
+assets/uploads/

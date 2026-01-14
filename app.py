@@ -1,15 +1,25 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 import os
-from datetime import date, datetime
-import io
+import time
 
-# ================= Page Config ==================
+# Core Logic & Utils
+from core import logic
+from utils import drive_utils
+
+# --- Page Config ---
 st.set_page_config(
-    page_title="Everest Inventory Management System",
+    page_title="Everest Inventory",
+    page_icon="📦",
     layout="wide",
-    initial_sidebar_state="collapsed" # Hide sidebar on splash
+    initial_sidebar_state="expanded"
 )
+
+# --- Data Loading ---
+INVENTORY_FILE = "data/inventory_db.csv"
+PURCHASE_FILE = "data/purchase_db.csv"
+logic.VENDOR_FILE = "data/vendor_mapping.csv"
 
 # ================= Splash Screen Logic ==================
 if "splash_shown" not in st.session_state:
@@ -146,25 +156,9 @@ if not st.session_state["splash_shown"]:
 
 # ================= Normal App Logic Starts Here ==================
 
-# ================= Ingredient Database (기본 하드코딩 백업) ==================
-# ================= Ingredient Database (기본 하드코딩 백업) ==================
-# ================= Ingredient Database (빈 상태로 시작) ==================
-ingredient_list = []
-
-# ================= Files (Absolute Paths for Persistence) ==================
-# Render Persistent Disk (/data) 확인, 없으면 현재 디렉토리 사용
-if os.path.exists("/data"):
-    BASE_DIR = "/data"
-else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
-HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
-ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 원본 (백업용)
-INV_DB = os.path.join(BASE_DIR, "inventory_db.csv")             # 재고용 DB
-PUR_DB = os.path.join(BASE_DIR, "purchase_db.csv")              # 구매용 DB
-VENDOR_FILE = os.path.join(BASE_DIR, "vendor_mapping.csv")      # 구매처 매핑 DB
-ORDERS_FILE = os.path.join(BASE_DIR, "orders_db.csv")           # 발주(주문) 내역 DB
+# ================= Files definition removed (Unified in core.logic) ==================
+# logic.BASE_DIR, logic.logic.DATA_FILE 등을 통해 접근 가능하나,
+# 보통 logic.logic.load_inventory() 등 함수를 직접 호출하므로 별도 정의 불필요.
 
 # ================= Login Logic ==================
 if "logged_in" not in st.session_state:
@@ -330,163 +324,22 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
-def robust_read_csv(file_path, **kwargs):
-    """
-    다양한 인코딩 및 형식을 지원하는 강건한 CSV 읽기 함수.
-    """
-    if not os.path.exists(file_path):
-        return pd.DataFrame()
-        
-    encodings = ['utf-8-sig', 'utf-16', 'cp949', 'latin-1']
-    for enc in encodings:
-        try:
-            # sep=None, engine='python'은 구분자 자동 감지를 위해 사용
-            df = pd.read_csv(file_path, sep=None, engine='python', encoding=enc, **kwargs)
-            return df
-        except (UnicodeDecodeError, UnicodeError):
-            continue
-        except Exception:
-            # 인코딩 외의 에러(예: 빈 파일)일 경우 다음으로 넘어가거나 빈 DF 반환
-            continue
-            
-    # 모든 인코딩 실패 시 최후의 방법 (바이트 무시)
-    try:
-        return pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8', errors='ignore', **kwargs)
-    except:
-        return pd.DataFrame()
-
-def load_item_db(file_path):
-    """
-    아이템 DB 로드 (robust_read_csv 사용)
-    """
-    items = []
-    df = robust_read_csv(file_path)
-    
-    if df.empty or len(df.columns) < 2:
-        return items
-        
-    try:
-        col_map = {c.lower().strip(): c for c in df.columns}
-        cat_col = next((col_map[k] for k in ["category", "cat", "카테고리"] if k in col_map), df.columns[0])
-        item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), df.columns[1] if len(df.columns) > 1 else None)
-        unit_col = next((col_map[k] for k in ["unit", "단위"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
-        
-        for _, row in df.iterrows():
-            cat = str(row[cat_col]).strip() if cat_col and cat_col in df.columns else ""
-            name = str(row[item_col]).strip() if item_col and item_col in df.columns else ""
-            unit = str(row[unit_col]).strip() if unit_col and unit_col in df.columns else ""
-            if cat and name and cat.lower() not in ["category", "카테고리"]:
-                items.append({"category": cat, "item": name, "unit": unit})
-    except Exception as e:
-        st.error(f"Error parsing items in {file_path}: {e}")
-        
-    return items
-
-def load_vendor_mapping():
-    mapping = {}
-    df = robust_read_csv(VENDOR_FILE)
-    if not df.empty:
-        try:
-            # 컬럼명 정규화
-            col_map = {c.lower().strip(): c for c in df.columns}
-            cat_col = next((col_map[k] for k in ["category", "카테고리"] if k in col_map), df.columns[0])
-            item_col = next((col_map[k] for k in ["item", "name", "아이템", "품목"] if k in col_map), None) # Item 컬럼 추가
-            vendor_col = next((col_map[k] for k in ["vendor", "구매처", "업체"] if k in col_map), df.columns[2] if len(df.columns) > 2 else None)
-            phone_col = next((col_map[k] for k in ["phone", "전화번호", "연락처"] if k in col_map), df.columns[3] if len(df.columns) > 3 else None)
-            
-            for _, row in df.iterrows():
-                cat = str(row[cat_col]).strip()
-                item = str(row[item_col]).strip() if item_col else "" # Item 값 읽기
-                vendor = str(row[vendor_col]).strip() if vendor_col else ""
-                phone = str(row[phone_col]).strip() if phone_col else ""
-                
-                # 키를 (Category, Item)으로 변경. Item이 없으면 포괄적인 Category 룰로 쓸 수도 있겠으나,
-                # 사용자 요청은 아이템별 매핑이므로 (cat, item)을 키로 잡음.
-                if cat and item:
-                    mapping[(cat, item)] = {"vendor": vendor, "phone": phone}
-                elif cat and not item: 
-                     # 혹시 Item 없이 카테고리만 있는 경우 'ALL' 키(또는 빈 문자열)로 처리하여 fallback 가능하게?
-                     # 일단 명확성을 위해 (cat, "") 키로 저장
-                     mapping[(cat, "")] = {"vendor": vendor, "phone": phone}
-        except Exception as e:
-            st.error(f"Error parsing vendors: {e}")
-    return mapping
-
-def get_all_categories(file_path):
-    db = load_item_db(file_path)
-    return sorted(set([i["category"] for i in db]))
-
-def get_all_units(file_path):
-    db = load_item_db(file_path)
-    return sorted(set([i["unit"] for i in db if i["unit"]]))
-
-def get_items_by_category(file_path, category):
-    db = load_item_db(file_path)
-    return sorted([i["item"] for i in db if i["category"] == category])
-
-def get_unit_for_item(file_path, category, item):
-    db = load_item_db(file_path)
-    for i in db:
-        if i["category"] == category and i["item"] == item:
-            return i["unit"]
-    return ""
-
-# ================= Data Load / Save ==================
-def load_inventory():
-    df = robust_read_csv(DATA_FILE)
-    expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
-    if df.empty:
-        return pd.DataFrame(columns=expected)
-    
-    # 필요한 컬럼 보장
-    for col in expected:
-        if col not in df.columns:
-            df[col] = ""
-    return df[expected]
-
-def save_inventory(df):
-    df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
-
-def load_history():
-    df = robust_read_csv(HISTORY_FILE)
-    expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
-    if df.empty:
-        return pd.DataFrame(columns=expected)
-        
-    for col in expected:
-        if col not in df.columns:
-            df[col] = ""
-    return df[expected]
-
-def save_history(df):
-    df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
-
-def load_orders():
-    df = robust_read_csv(ORDERS_FILE)
-    expected = ["OrderId", "Date", "Branch", "Vendor", "Items", "Status", "CreatedDate"]
-    if df.empty:
-        return pd.DataFrame(columns=expected)
-    for col in expected:
-        if col not in df.columns:
-            df[col] = ""
-    return df[expected]
-
-def save_orders(df):
-    df.to_csv(ORDERS_FILE, index=False, encoding="utf-8-sig")
+# ================= Data Load / Save Logic Removed ==================
+# core.logic 모듈 사용으로 대체됨.
 
 # ================= Session & Data Refresh ==================
 # 매 리런(Rerun) 마다 최신 데이터를 파일에서 직접 읽어오도록 하여 실시간성 확보
-st.session_state.inventory = load_inventory()
-st.session_state.history = load_history()
+st.session_state.inventory = logic.logic.load_inventory()
+st.session_state.history = logic.logic.load_history()
 
 # Default role: Staff (REMOVED)
 # ...
 
-branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
+branches = logic.BRANCHES
 
 # --- Storage Status Check ---
 storage_mode = "Unknown"
-if BASE_DIR == "/data":
+if os.path.exists("/data"):
     storage_mode = "Persistent 🟢"
     storage_msg = "Data is saved to Persistent Disk (/data)."
 else:
@@ -498,8 +351,8 @@ else:
 col_h1, col_h2 = st.columns([0.5, 9.5])
 
 with col_h1:
-    if os.path.exists("logo_circle.png"):
-        st.image("logo_circle.png", width=50)       
+    if os.path.exists("assets/logo_circle.png"):
+        st.image("assets/logo_circle.png", width=50)       
     else:
         st.markdown("<div style='font-size:2rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
 
@@ -562,20 +415,20 @@ if tab1:
         
         with col1:
             branch = st.selectbox("Branch", branches, key="branch")
-            category = st.selectbox("Category", get_all_categories(INV_DB), key="category")
+            category = st.selectbox("Category", logic.get_all_categories(logic.logic.INV_DB), key="category")
         
         with col2:
             input_type = st.radio("Item Input", ["Select from list", "Type manually"], key="input_type")
             if input_type == "Select from list":
-                items = get_items_by_category(INV_DB, category)
+                items = logic.get_items_by_category(logic.logic.INV_DB, category)
                 item = st.selectbox("Item name", items, key="item_name")
             else:
                 item = st.text_input("Item name", key="item_name_manual")
 
             # ---- Unit 자동 세팅 + 선택 가능 ----
-            auto_unit = get_unit_for_item(INV_DB, category, item) if input_type == "Select from list" else ""
+            auto_unit = logic.get_unit_for_item(logic.logic.INV_DB, category, item) if input_type == "Select from list" else ""
             # unit_options = ["", "kg", "g", "pcs", "box", "L", "mL", "pack", "bag"]  # Old hardcoded
-            unit_options = [""] + get_all_units(INV_DB)  # Dynamic from DB
+            unit_options = [""] + logic.get_all_units(logic.logic.INV_DB)  # Dynamic from DB
             
             # 아이템이 변경되었는지 확인하여 unit_select 강제 업데이트
             current_item_key = f"last_item_{category}_{item}"
@@ -659,7 +512,7 @@ if tab1:
                     df = pd.concat([df, new_row], ignore_index=True)
                     st.success("Registered Successfully!")
                 st.session_state.inventory = df
-                save_inventory(df)
+                logic.logic.save_inventory(df)
         
         with b_col2:
             if is_update:
@@ -667,7 +520,7 @@ if tab1:
                     df = st.session_state.inventory.copy()
                     df = df[~mask]
                     st.session_state.inventory = df
-                    save_inventory(df)
+                    logic.logic.save_inventory(df)
                     st.warning("Item Deleted.")
                     st.session_state.last_loaded_key = ""
                     st.rerun()
@@ -716,8 +569,8 @@ with tab3:
     st.subheader("🛒 Item Purchase (품목 구매)")
     st.info("구매할 품목의 수량을 입력하면 구매처별로 정리하여 문자를 보낼 수 있습니다.")
     
-    vendor_map = load_vendor_mapping()
-    all_items = load_item_db(PUR_DB)
+    vendor_map = logic.load_vendor_mapping()
+    all_items = logic.load_item_db(logic.logic.PUR_DB)
     
     # --- Date & Branch Selection (New) ---
     pb_col1, pb_col2 = st.columns(2)
@@ -736,7 +589,7 @@ with tab3:
     
     with p_col1:
         st.markdown("### 1. Select Items")
-        p_cat = st.selectbox("Category", ["All"] + get_all_categories(PUR_DB), key="p_cat")
+        p_cat = st.selectbox("Category", ["All"] + logic.get_all_categories(logic.logic.PUR_DB), key="p_cat")
         
         filtered_items = []
         if p_cat == "All":
@@ -826,7 +679,7 @@ with tab3:
                     "cat": cat,
                     "item": item,
                     "qty": qty,
-                    "unit": get_unit_for_item(PUR_DB, cat, item)
+                    "unit": get_unit_for_item(logic.PUR_DB, cat, item)
                 })
             
             for v_name, data in vendor_groups.items():
@@ -882,7 +735,7 @@ with tab3:
                         import uuid
                         import json
                         
-                        orders_df = load_orders()
+                        orders_df = logic.load_orders()
                         new_order = {
                             "OrderId": str(uuid.uuid4()),
                             "Date": str(p_date),
@@ -896,7 +749,7 @@ with tab3:
                         # pd.concat to add row
                         new_row_df = pd.DataFrame([new_order])
                         orders_df = pd.concat([orders_df, new_row_df], ignore_index=True)
-                        save_orders(orders_df)
+                        logic.save_orders(orders_df)
                         
                         st.toast(f"✅ Order Saved! Opening SMS...", icon="📨")
                         
@@ -915,7 +768,7 @@ with tab3:
             st.subheader("3. Order Status (발주 현황 및 입고 처리)")
             st.info("발주 후 도착한 물품을 확인하고 '입고 확정' 버튼을 누르면 재고에 자동 반영됩니다.")
             
-            orders_df = load_orders()
+            orders_df = logic.load_orders()
             if not orders_df.empty:
                 # [Fix] Keep 'Completed' items visible if they were just confirmed, to allow photo upload.
                 if "freshly_confirmed" not in st.session_state:
@@ -1015,9 +868,9 @@ with tab3:
                                     # 3. Save All
                                     st.session_state.inventory = inv_df
                                     st.session_state.history = hist_df
-                                    save_inventory(inv_df)
-                                    save_history(hist_df)
-                                    save_orders(orders_df)
+                                    logic.save_inventory(inv_df)
+                                    logic.save_history(hist_df)
+                                    logic.save_orders(orders_df)
                                     
                                     # [Fix] Add to freshly_confirmed so it stays visible for photo upload
                                     st.session_state.freshly_confirmed.append(oid)
@@ -1048,7 +901,7 @@ with tab3:
                                     # Avoid re-uploading loops
                                     if f"uploaded_{oid}" not in st.session_state:
                                         with st.spinner("☁️ Uploading to Base (본사 전송 중)..."):
-                                            from drive_utils import upload_file_to_drive
+                                            from utils.drive_utils import upload_file_to_drive
                                             # Filename: Date_Branch_Vendor.jpg
                                             file_name = f"{o_date.replace('-', '')}_{o_branch}_{o_vendor}_{oid[:4]}.jpg"
                                             img_file.seek(0)
@@ -1102,12 +955,12 @@ with tab4:
         log_branch = st.selectbox("Branch", branches, key="log_branch")
     
     with c2:
-        log_category = st.selectbox("Category", get_all_categories(INV_DB), key="log_category")
-        log_items = get_items_by_category(INV_DB, log_category)
+        log_category = st.selectbox("Category", get_all_categories(logic.INV_DB), key="log_category")
+        log_items = get_items_by_category(logic.INV_DB, log_category)
         log_item = st.selectbox("Item", log_items, key="log_item")
     
     with c3:
-        log_unit = get_unit_for_item(INV_DB, log_category, log_item)
+        log_unit = get_unit_for_item(logic.INV_DB, log_category, log_item)
         st.write(f"Unit: **{log_unit or '-'}**")
         
         # --- 실시간 재고 확인 로직 추가 ---
@@ -1136,7 +989,7 @@ with tab4:
             str(log_date), log_branch, log_category, log_item, log_unit, log_type, log_qty
         ]
         st.session_state.history = history_df
-        save_history(history_df)
+        logic.save_history(history_df)
 
         # 2) 재고 자동 반영
         inv = st.session_state.inventory.copy()
@@ -1158,7 +1011,7 @@ with tab4:
                 st.warning("OUT인데 해당 재고가 없어서 수량은 반영되지 않았습니다.")
 
         st.session_state.inventory = inv
-        save_inventory(inv)
+        logic.save_inventory(inv)
         st.success("IN / OUT recorded and inventory updated!")
 
     st.markdown("### Recent Stock Movements")
@@ -1181,7 +1034,7 @@ with tab5:
             with a1:
                 sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
             with a2:
-                sel_cat = st.selectbox("Category", ["All"] + get_all_categories(INV_DB), key="ana_cat")
+                sel_cat = st.selectbox("Category", ["All"] + get_all_categories(logic.INV_DB), key="ana_cat")
             with a3:
                 # 기간 선택 (월 단위)
                 year_options = sorted(set(history_df["DateObj"].dt.year))
@@ -1308,7 +1161,7 @@ if tab7:
             st.markdown(f"### ⚙️ System Configuration")
             
             # Storage Status Warning
-            if BASE_DIR == "/data":
+            if os.path.exists("/data"):
                  st.success("✅ **연결 성공 (Connected)**: 보존형 디스크(/data)가 정상적으로 연결되었습니다. 이제 데이터를 업로드하면 영구적으로 저장됩니다.")
             else:
                  st.error("⚠️ **저장소 미연결 (Not Connected)**: 디스크가 연결되지 않았습니다. Render 대시보드에서 설정을 확인하세요.")
@@ -1320,9 +1173,9 @@ if tab7:
             
             # Inventory DB Status
             inv_count = 0
-            if os.path.exists(INV_DB):
+            if os.path.exists(logic.INV_DB):
                 try:
-                    inv_count = len(robust_read_csv(INV_DB))
+                    inv_count = len(logic.robust_read_csv(logic.INV_DB))
                     st.success(f"**Inventory DB**: ✅ {inv_count} items saved.")
                 except:
                     st.error("**Inventory DB**: ❌ File corrupted.")
@@ -1331,9 +1184,9 @@ if tab7:
 
             # Purchase DB Status
             pur_count = 0
-            if os.path.exists(PUR_DB):
+            if os.path.exists(logic.PUR_DB):
                 try:
-                    pur_count = len(robust_read_csv(PUR_DB))
+                    pur_count = len(logic.robust_read_csv(logic.PUR_DB))
                     st.success(f"**Purchase DB**: ✅ {pur_count} items saved.")
                 except:
                      st.error("**Purchase DB**: ❌ File corrupted.")
@@ -1347,7 +1200,7 @@ if tab7:
                 st.error("이 버튼을 누르면 모든 데이터가 영구적으로 삭제됩니다. 처음부터 다시 시작할 때만 사용하세요.")
                 if st.button("🧨 Delete All Data (모든 데이터 삭제)", key="init_btn", type="primary"):
                     try:
-                        files_to_delete = [INV_DB, PUR_DB, VENDOR_FILE, ORDERS_FILE, DATA_FILE, HISTORY_FILE]
+                        files_to_delete = [logic.INV_DB, logic.PUR_DB, logic.VENDOR_FILE, logic.ORDERS_FILE, logic.DATA_FILE, logic.HISTORY_FILE]
                         for f in files_to_delete:
                             if os.path.exists(f):
                                 os.remove(f)
@@ -1425,9 +1278,9 @@ if tab7:
                         if up_inv.name.endswith('.xlsx'):
                             df_inv = pd.read_excel(up_inv)
                         else:
-                            # 템플릿용 파일이므로 robust_read_csv 대신 StringIO와 encoding 시도
-                            df_inv = robust_read_csv(up_inv)
-                        apply_data_to_db(df_inv, INV_DB, "Inventory")
+                            # 템플릿용 파일이므로 logic.robust_read_csv 대신 StringIO와 encoding 시도
+                            df_inv = logic.robust_read_csv(up_inv)
+                        apply_data_to_db(df_inv, logic.INV_DB, "Inventory")
                     except Exception as e: st.error(f"Upload error: {e}")
             with i_col2:
                 paste_inv = st.text_area("Paste Data (from Excel)", key="paste_inv", height=100, help="엑셀에서 복사하여 붙여넣으세요.")
@@ -1435,12 +1288,12 @@ if tab7:
                     try:
                         # 붙여넣기 데이터는 보통 탭 구분
                         df_inv_p = pd.read_csv(io.StringIO(paste_inv), sep="\t")
-                        apply_data_to_db(df_inv_p, INV_DB, "Inventory")
+                        apply_data_to_db(df_inv_p, logic.INV_DB, "Inventory")
                     except Exception as e:
                         # 탭 실패 시 콤마 시도
                         try:
                             df_inv_p = pd.read_csv(io.StringIO(paste_inv))
-                            apply_data_to_db(df_inv_p, INV_DB, "Inventory")
+                            apply_data_to_db(df_inv_p, logic.INV_DB, "Inventory")
                         except: st.error(f"Paste error: {e}")
 
             st.markdown("---")
@@ -1456,19 +1309,19 @@ if tab7:
                         if up_pur.name.endswith('.xlsx'):
                             df_pur = pd.read_excel(up_pur)
                         else:
-                            df_pur = robust_read_csv(up_pur)
-                        apply_data_to_db(df_pur, PUR_DB, "Purchase")
+                            df_pur = logic.robust_read_csv(up_pur)
+                        apply_data_to_db(df_pur, logic.PUR_DB, "Purchase")
                     except Exception as e: st.error(f"Upload error: {e}")
             with p_col2:
                 paste_pur = st.text_area("Paste Data (from Excel)", key="paste_pur", height=100, help="엑셀에서 복사하여 붙여넣으세요.")
                 if paste_pur:
                     try:
                         df_pur_p = pd.read_csv(io.StringIO(paste_pur), sep="\t")
-                        apply_data_to_db(df_pur_p, PUR_DB, "Purchase")
+                        apply_data_to_db(df_pur_p, logic.PUR_DB, "Purchase")
                     except Exception as e:
                         try:
                             df_pur_p = pd.read_csv(io.StringIO(paste_pur))
-                            apply_data_to_db(df_pur_p, PUR_DB, "Purchase")
+                            apply_data_to_db(df_pur_p, logic.PUR_DB, "Purchase")
                         except: st.error(f"Paste error: {e}")
 
             st.markdown("---")
@@ -1501,7 +1354,7 @@ if tab7:
                     st.dataframe(new_df.head(), use_container_width=True)
 
                     if st.button("✅ Apply to Vendor DB", key="apply_vendor"):
-                        new_df.to_csv(VENDOR_FILE, index=False, encoding="utf-8-sig")
+                        new_df.to_csv(logic.VENDOR_FILE, index=False, encoding="utf-8-sig")
                         st.success("Successfully updated Vendor Mapping!")
                         st.rerun()
                 except Exception as e:
@@ -1515,7 +1368,7 @@ if tab7:
                         if up_vend.name.endswith('.xlsx'):
                             df_vend = pd.read_excel(up_vend)
                         else:
-                            df_vend = robust_read_csv(up_vend)
+                            df_vend = logic.robust_read_csv(up_vend)
                         apply_vendor_to_db(df_vend)
                     except Exception as e: st.error(f"Upload error: {e}")
             with v_col2:
@@ -1535,8 +1388,8 @@ if tab7:
             st.markdown("### 4. Emergency Recovery")
             if st.button("🚀 Initialize with Default Data", key="init_defaults"):
                 default_df = pd.DataFrame([["Vegetable", "Onion", "kg"]], columns=["Category", "Item", "Unit"])
-                default_df.to_csv(INV_DB, index=False, encoding="utf-8-sig")
-                default_df.to_csv(PUR_DB, index=False, encoding="utf-8-sig")
+                default_df.to_csv(logic.INV_DB, index=False, encoding="utf-8-sig")
+                default_df.to_csv(logic.PUR_DB, index=False, encoding="utf-8-sig")
                 st.success("Databases initialized! Reloading...")
                 st.rerun()
 
@@ -1607,8 +1460,8 @@ with tab8:
 
     st.markdown("---")
     st.download_button(
-        label="⬇ Download Detailed Word Manual (विस्तृत पुस्तिका डाउनलोड गर्नुहोस्)",
-        data=open(os.path.join(BASE_DIR, 'Everest_Manual.docx'), 'rb').read() if os.path.exists(os.path.join(BASE_DIR, 'Everest_Manual.docx')) else b"",
+        label="⬇ Download Detailed Word Manual (비스트 푸스티카 다운로드)",
+        data=open(os.path.join(logic.BASE_PROJECT_DIR, 'Everest_Manual.docx'), 'rb').read() if os.path.exists(os.path.join(logic.BASE_PROJECT_DIR, 'Everest_Manual.docx')) else b"",
         file_name="Everest_Manual.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )

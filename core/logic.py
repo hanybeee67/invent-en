@@ -4,19 +4,21 @@ from datetime import date, datetime
 import json
 
 # ================= Files (Absolute Paths for Persistence) ==================
-# Render Persistent Disk (/data) 확인, 없으면 현재 디렉토리 사용
-if os.path.exists("/data"):
-    BASE_DIR = "/data"
-else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Base Project Directory (Parent of 'core')
+BASE_PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_PROJECT_DIR, "data")
 
-DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
-HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
-ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 원본 (백업용)
-INV_DB = os.path.join(BASE_DIR, "inventory_db.csv")             # 재고용 DB
-PUR_DB = os.path.join(BASE_DIR, "purchase_db.csv")              # 구매용 DB
-VENDOR_FILE = os.path.join(BASE_DIR, "vendor_mapping.csv")      # 구매처 매핑 DB
-ORDERS_FILE = os.path.join(BASE_DIR, "orders_db.csv")           # 발주(주문) 내역 DB
+# Ensure data directory exists
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+DATA_FILE = os.path.join(DATA_DIR, "inventory_data.csv")          # 재고 스냅샷
+HISTORY_FILE = os.path.join(DATA_DIR, "stock_history.csv")        # 입출고 로그
+ITEM_FILE = os.path.join(DATA_DIR, "food ingredients.txt")        # 원본 (백업용)
+INV_DB = os.path.join(DATA_DIR, "inventory_db.csv")             # 재고용 DB
+PUR_DB = os.path.join(DATA_DIR, "purchase_db.csv")              # 구매용 DB
+VENDOR_FILE = os.path.join(DATA_DIR, "vendor_mapping.csv")      # 구매처 매핑 DB
+ORDERS_FILE = os.path.join(DATA_DIR, "orders_db.csv")           # 발주(주문) 내역 DB
 
 BRANCHES = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
 

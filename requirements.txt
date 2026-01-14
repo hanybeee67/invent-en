@@ -1,11 +1,5 @@
 streamlit
 pandas
-numpy
-plotly
-openpyxl
-python-docx
-reportlab
 google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-flet
+google-auth
+python-dotenv
