@@ -111,7 +111,7 @@ if not st.session_state["splash_shown"]:
             data = f.read()
         return base64.b64encode(data).decode()
 
-    bg_img_path = "assets/everest_splash_bg.jpg"
+    bg_img_path = "everest_splash_bg.jpg"
     if os.path.exists(bg_img_path):
         bin_str = get_base64_of_bin_file(bg_img_path)
         page_bg_img = f'''
@@ -152,14 +152,11 @@ if not st.session_state["splash_shown"]:
 ingredient_list = []
 
 # ================= Files (Absolute Paths for Persistence) ==================
-# Render Persistent Disk (/data) 확인, 없으면 현재 디렉토리의 data 폴더 사용
+# Render Persistent Disk (/data) 확인, 없으면 현재 디렉토리 사용
 if os.path.exists("/data"):
     BASE_DIR = "/data"
 else:
-    BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-
-if not os.path.exists(BASE_DIR):
-    os.makedirs(BASE_DIR, exist_ok=True)
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
 HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
@@ -501,8 +498,8 @@ else:
 col_h1, col_h2 = st.columns([0.5, 9.5])
 
 with col_h1:
-    if os.path.exists("assets/logo_circle.png"):
-        st.image("assets/logo_circle.png", width=50)       
+    if os.path.exists("logo_circle.png"):
+        st.image("logo_circle.png", width=50)       
     else:
         st.markdown("<div style='font-size:2rem; text-align:center;'>🏔</div>", unsafe_allow_html=True)
 
