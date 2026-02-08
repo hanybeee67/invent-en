@@ -514,6 +514,7 @@ def get_unit_for_item(file_path, category, item):
     return ""
 
 # ================= Data Load / Save ==================
+@st.cache_data(ttl=60)  # Cache for 60 seconds
 def load_inventory():
     df = robust_read_csv(DATA_FILE)
     expected = ["Branch","Item","Category","Unit","CurrentQty","MinQty","Note","Date"]
@@ -528,7 +529,10 @@ def load_inventory():
 
 def save_inventory(df):
     df.to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
+    # Clear cache after saving
+    load_inventory.clear()
 
+@st.cache_data(ttl=60)  # Cache for 60 seconds
 def load_history():
     df = robust_read_csv(HISTORY_FILE)
     expected = ["Date","Branch","Category","Item","Unit","Type","Qty"]
@@ -542,6 +546,8 @@ def load_history():
 
 def save_history(df):
     df.to_csv(HISTORY_FILE, index=False, encoding="utf-8-sig")
+    # Clear cache after saving
+    load_history.clear()
 
 def load_orders():
     df = robust_read_csv(ORDERS_FILE)
