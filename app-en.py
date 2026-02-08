@@ -173,11 +173,31 @@ ORDERS_FILE = os.path.join(BASE_DIR, "orders_db.csv")           # 발주(주문)
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
+# Import security utilities (optional - graceful fallback)
+try:
+    from utils.security import verify_password, check_session_timeout, get_session_remaining_time, format_session_time
+    SECURITY_MODULE_AVAILABLE = True
+except ImportError:
+    SECURITY_MODULE_AVAILABLE = False
+
 def check_login(key_suffix):
     """
     Returns True if logged in, False if not (and shows login form).
     key_suffix: unique string for widget keys (e.g., "tab4")
     """
+    # Check session timeout if security module is available
+    if SECURITY_MODULE_AVAILABLE and st.session_state.get("logged_in", False):
+        is_valid, message = check_session_timeout(st.session_state)
+        if not is_valid:
+            st.warning(f"⏰ {message}")
+            st.session_state["logged_in"] = False
+            st.rerun()
+        else:
+            # Show remaining session time in sidebar (optional)
+            remaining = get_session_remaining_time(st.session_state)
+            if remaining < 300:  # Less than 5 minutes
+                st.sidebar.info(f"⏱️ Session: {format_session_time(remaining)}")
+    
     if st.session_state["logged_in"]:
         return True
 
@@ -185,11 +205,21 @@ def check_login(key_suffix):
     password = st.text_input("Password", type="password", key=f"login_pw_{key_suffix}")
     
     if st.button("Login", key=f"login_btn_{key_suffix}"):
-        if password == "1234":
-            st.session_state["logged_in"] = True
-            st.rerun()
+        # Try new security module first, fallback to hardcoded
+        if SECURITY_MODULE_AVAILABLE:
+            if verify_password(password):
+                st.session_state["logged_in"] = True
+                st.session_state["last_activity"] = __import__('time').time()
+                st.rerun()
+            else:
+                st.error("Incorrect Password")
         else:
-            st.error("Incorrect Password")
+            # Original logic (backward compatibility)
+            if password == "1234":
+                st.session_state["logged_in"] = True
+                st.rerun()
+            else:
+                st.error("Incorrect Password")
     
     return False
 
@@ -1317,6 +1347,69 @@ if tab7:
                  st.error("⚠️ **저장소 미연결 (Not Connected)**: 디스크가 연결되지 않았습니다. Render 대시보드에서 설정을 확인하세요.")
             
             st.write("---")
+            
+            # --- 1.5 Backup & Restore (New Feature) ---
+            try:
+                from utils.backup import create_backup, list_backups, restore_from_backup, cleanup_old_backups, get_backup_stats
+                BACKUP_MODULE_AVAILABLE = True
+            except ImportError:
+                BACKUP_MODULE_AVAILABLE = False
+            
+            if BACKUP_MODULE_AVAILABLE:
+                st.markdown("### 💾 Backup & Restore (백업 및 복원)")
+                
+                col_b1, col_b2 = st.columns(2)
+                
+                with col_b1:
+                    st.markdown("**Create Backup (백업 생성)**")
+                    if st.button("📦 Create Backup Now (지금 백업)", type="primary", use_container_width=True):
+                        files_to_backup = [DATA_FILE, HISTORY_FILE, ORDERS_FILE, INV_DB, PUR_DB, VENDOR_FILE]
+                        success, msg = create_backup(BASE_DIR, files_to_backup)
+                        if success:
+                            st.success(msg)
+                        else:
+                            st.error(msg)
+                    
+                    # Auto cleanup old backups
+                    if st.button("🗑️ Cleanup Old Backups (오래된 백업 삭제)", use_container_width=True):
+                        success, msg = cleanup_old_backups(BASE_DIR, retention_days=30)
+                        if success:
+                            st.info(msg)
+                        else:
+                            st.error(msg)
+                
+                with col_b2:
+                    st.markdown("**Backup Statistics (백업 통계)**")
+                    stats = get_backup_stats(BASE_DIR)
+                    if stats["total_backups"] > 0:
+                        st.metric("Total Backups", stats["total_backups"])
+                        st.metric("Total Size", f"{stats['total_size_mb']} MB")
+                        st.caption(f"Newest: {stats['newest_date'].strftime('%Y-%m-%d %H:%M')}")
+                    else:
+                        st.info("No backups yet. Create your first backup!")
+                
+                # Restore section
+                with st.expander("🔄 Restore from Backup (백업에서 복원)"):
+                    backups = list_backups(BASE_DIR)
+                    if backups:
+                        backup_options = {f"{b['name']} ({b['size_mb']} MB)": b['path'] for b in backups}
+                        selected_backup = st.selectbox("Select Backup", list(backup_options.keys()))
+                        
+                        st.warning("⚠️ 복원하면 현재 데이터가 백업 데이터로 덮어씌워집니다!")
+                        
+                        if st.button("🔄 Restore Selected Backup", type="primary"):
+                            backup_path = backup_options[selected_backup]
+                            success, msg = restore_from_backup(backup_path, BASE_DIR)
+                            if success:
+                                st.success(msg)
+                                st.balloons()
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                    else:
+                        st.info("백업 파일이 없습니다.")
+                
+                st.write("---")
             
             # --- 2. Current Data Status (현재 데이터 상태 확인) ---
             st.markdown("### 📊 Current Data Status (현재 저장된 데이터)")

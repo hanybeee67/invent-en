@@ -11,6 +11,9 @@ google_keys.json
 service_account.json
 client_secret.json
 
+# Environment variables (contains sensitive data)
+.env
+
 # Streamlit
 .streamlit/
 !/.streamlit/config.toml
@@ -23,5 +26,10 @@ client_secret.json
 # Let's NOT gitignore csvs unless user asked. The prompt said "Google keys... gitignore".
 # It didn't say gitignore csvs.
 
+
 # Uploads
 assets/uploads/
+uploads/
+
+# Auth Tokens
+token.json
