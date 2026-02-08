@@ -332,11 +332,51 @@ html, body, [class*="css"] {
     padding: 0.4rem 0.8rem;
     font-weight: 600;
     transition: all 0.3s ease;
+    min-height: 44px; /* Larger touch target for mobile */
 }
 .stButton > button:hover {
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
     transform: translateY(-2px);
 }
+
+/* 6. Mobile Optimizations */
+@media (max-width: 768px) {
+    /* Larger touch targets */
+    .stButton > button {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+    
+    /* Larger input fields */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input {
+        min-height: 48px;
+        font-size: 16px; /* Prevent iOS zoom on focus */
+    }
+    
+    /* Compact header on mobile */
+    .title-text {
+        font-size: 1.2rem !important;
+    }
+    .subtitle-text {
+        font-size: 0.7rem !important;
+    }
+    
+    /* Tab adjustments */
+    .stTabs [data-baseweb="tab"] {
+        min-width: 60px;
+        padding: 8px 12px;
+        font-size: 1.2rem; /* Larger icons */
+    }
+    
+    /* Reduce padding on mobile */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}
+
 /* 2. Compact Header Area (Fixed Clipping) */
 .header-container {
     display: flex;
@@ -569,17 +609,44 @@ if not st.session_state.inventory.empty:
 
 # ================= Tabs ==================
 
-# ================= Tabs ==================
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "✏ Register / Edit",
-    "📊 View / Print",
-    "🛒 Purchase",
-    "📦 IN / OUT Log",
-    "📈 Usage Analysis",
-    "📄 Monthly Report",
-    "💾 Data Management",
-    "❓ Help Manual"
-])
+# Mobile Detection (viewport-based)
+# Inject JavaScript to detect screen width
+st.markdown("""
+<script>
+    // Detect if mobile (screen width < 768px)
+    const isMobile = window.innerWidth < 768;
+    // Store in sessionStorage
+    sessionStorage.setItem('isMobile', isMobile);
+    
+    // Send to Streamlit (optional, for Python access)
+    window.parent.postMessage({type: 'streamlit:setComponentValue', value: isMobile}, '*');
+</script>
+""", unsafe_allow_html=True)
+
+# Check if mobile mode from session state
+if "is_mobile" not in st.session_state:
+    # Default to desktop, will be updated by JS
+    st.session_state.is_mobile = False
+
+# Responsive tab names
+if st.session_state.get("is_mobile", False):
+    # Mobile: Icon only
+    tab_names = ["✏️", "📊", "🛒", "📦", "📈", "📄", "💾", "❓"]
+else:
+    # Desktop: Icon + Text
+    tab_names = [
+        "✏ Register / Edit",
+        "📊 View / Print",
+        "🛒 Purchase",
+        "📦 IN / OUT Log",
+        "📈 Usage Analysis",
+        "📄 Monthly Report",
+        "💾 Data Management",
+        "❓ Help Manual"
+    ]
+
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(tab_names)
+
 
 # ======================================================
 # TAB 1: Register / Edit Inventory (Manager Only)
