@@ -4,9 +4,31 @@ import os
 from datetime import date, datetime
 import io
 
+# Import centralized configuration
+from config import (
+    APP_NAME,
+    BRANCHES,
+    BASE_DIR,
+    STORAGE_MODE,
+    STORAGE_MESSAGE,
+    DATA_FILE,
+    HISTORY_FILE,
+    ORDERS_FILE,
+    INV_DB,
+    PUR_DB,
+    VENDOR_FILE,
+    ITEM_FILE,
+    INVENTORY_COLUMNS,
+    HISTORY_COLUMNS,
+    ORDERS_COLUMNS,
+    TAB_NAMES_DESKTOP,
+    TAB_NAMES_MOBILE,
+    get_all_file_paths
+)
+
 # ================= Page Config ==================
 st.set_page_config(
-    page_title="Everest Inventory Management System",
+    page_title=APP_NAME,
     layout="wide",
     initial_sidebar_state="collapsed" # Hide sidebar on splash
 )
@@ -153,21 +175,8 @@ ingredient_list = []
 
 # ================= Files (Absolute Paths for Persistence) ==================
 # Render Persistent Disk (/data) 확인, 없으면 현재 디렉토리의 data 폴더 사용
-if os.path.exists("/data"):
-    BASE_DIR = "/data"
-else:
-    BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR, exist_ok=True)
-
-DATA_FILE = os.path.join(BASE_DIR, "inventory_data.csv")          # 재고 스냅샷
-HISTORY_FILE = os.path.join(BASE_DIR, "stock_history.csv")        # 입출고 로그
-ITEM_FILE = os.path.join(BASE_DIR, "food ingredients.txt")        # 원본 (백업용)
-INV_DB = os.path.join(BASE_DIR, "inventory_db.csv")             # 재고용 DB
-PUR_DB = os.path.join(BASE_DIR, "purchase_db.csv")              # 구매용 DB
-VENDOR_FILE = os.path.join(BASE_DIR, "vendor_mapping.csv")      # 구매처 매핑 DB
-ORDERS_FILE = os.path.join(BASE_DIR, "orders_db.csv")           # 발주(주문) 내역 DB
 
 # ================= Login Logic ==================
 if "logged_in" not in st.session_state:
@@ -552,21 +561,6 @@ def save_orders(df):
 st.session_state.inventory = load_inventory()
 st.session_state.history = load_history()
 
-# Default role: Staff (REMOVED)
-# ...
-
-branches = ["동대문","굿모닝시티","양재","수원영통","동탄","영등포","룸비니"]
-
-# --- Storage Status Check ---
-storage_mode = "Unknown"
-if BASE_DIR == "/data":
-    storage_mode = "Persistent 🟢"
-    storage_msg = "Data is saved to Persistent Disk (/data)."
-else:
-    storage_mode = "Temporary ⚠️"
-    storage_msg = "Data is saved locally (Temporary). Data may be lost on restart if on cloud."
-# ----------------------------
-
 # ================= Header (Compact) ==================
 col_h1, col_h2 = st.columns([0.5, 9.5])
 
@@ -583,7 +577,7 @@ with col_h2:
         <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;">
             <h1 class="title-text" style="font-size: 1.8rem; margin: 0;">Everest Inventory</h1>
             <p class="subtitle-text" style="margin: 0; white-space: normal;">Professional Stock Management System</p>
-            <span style="font-size: 0.8rem; background: #334155; padding: 2px 8px; border-radius: 4px; color: #94a3b8;">{storage_mode}</span>
+            <span style="font-size: 0.8rem; background: #334155; padding: 2px 8px; border-radius: 4px; color: #94a3b8;">{STORAGE_MODE}</span>
         </div>
         """, unsafe_allow_html=True)
     with h_col2:
@@ -628,22 +622,11 @@ if "is_mobile" not in st.session_state:
     # Default to desktop, will be updated by JS
     st.session_state.is_mobile = False
 
-# Responsive tab names
+# Responsive tab names (from config)
 if st.session_state.get("is_mobile", False):
-    # Mobile: Icon only
-    tab_names = ["✏️", "📊", "🛒", "📦", "📈", "📄", "💾", "❓"]
+    tab_names = TAB_NAMES_MOBILE
 else:
-    # Desktop: Icon + Text
-    tab_names = [
-        "✏ Register / Edit",
-        "📊 View / Print",
-        "🛒 Purchase",
-        "📦 IN / OUT Log",
-        "📈 Usage Analysis",
-        "📄 Monthly Report",
-        "💾 Data Management",
-        "❓ Help Manual"
-    ]
+    tab_names = TAB_NAMES_DESKTOP
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(tab_names)
 
@@ -661,7 +644,7 @@ if tab1:
             selected_date = st.date_input("📅 Date", value=date.today(), key="selected_date")
         
         with col1:
-            branch = st.selectbox("Branch", branches, key="branch")
+            branch = st.selectbox("Branch", BRANCHES, key="branch")
             category = st.selectbox("Category", get_all_categories(INV_DB), key="category")
         
         with col2:
@@ -786,7 +769,7 @@ with tab2:
         df = df[df["Date"] == str(date_filter)]
     
     # 지점 필터 (추가됨)
-    branch_filter = st.selectbox("Branch", ["All"] + branches, key="view_branch")
+    branch_filter = st.selectbox("Branch", ["All"] + BRANCHES, key="view_branch")
     if branch_filter != "All":
         df = df[df["Branch"] == branch_filter]
     
@@ -824,7 +807,7 @@ with tab3:
     with pb_col1:
         p_date = st.date_input("날짜 (Date)", value=date.today(), key="p_date")
     with pb_col2:
-        p_branch = st.selectbox("지점 (Branch)", branches, key="p_branch")
+        p_branch = st.selectbox("지점 (Branch)", BRANCHES, key="p_branch")
     
     st.markdown("---")
     # -------------------------------------
@@ -1199,7 +1182,7 @@ with tab4:
 
     with c1:
         log_date = st.date_input("Date", value=date.today(), key="log_date")
-        log_branch = st.selectbox("Branch", branches, key="log_branch")
+        log_branch = st.selectbox("Branch", BRANCHES, key="log_branch")
     
     with c2:
         log_category = st.selectbox("Category", get_all_categories(INV_DB), key="log_category")
@@ -1279,7 +1262,7 @@ with tab5:
 
             a1, a2, a3 = st.columns(3)
             with a1:
-                sel_branch = st.selectbox("Branch", ["All"] + branches, key="ana_branch")
+                sel_branch = st.selectbox("Branch", ["All"] + BRANCHES, key="ana_branch")
             with a2:
                 sel_cat = st.selectbox("Category", ["All"] + get_all_categories(INV_DB), key="ana_cat")
             with a3:
