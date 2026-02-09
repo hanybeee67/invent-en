@@ -371,20 +371,12 @@ html, body, [class*="css"] {
         font-size: 0.7rem !important;
     }
     
-    /* Tab adjustments - Better approach */
+    /* Mobile tab adjustments - show full text, just make tabs responsive */
     .stTabs [data-baseweb="tab"] {
         padding: 10px 8px !important;
-        min-width: 50px !important;
-        font-size: 1.8rem !important;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-    
-    /* Hide everything except first emoji character */
-    .stTabs [data-baseweb="tab"] > div {
-        max-width: 30px;
-        overflow: hidden;
-        text-overflow: clip;
+        font-size: 0.85rem !important;
+        white-space: normal !important;
+        line-height: 1.2 !important;
     }
     
     /* Reduce padding on mobile */
