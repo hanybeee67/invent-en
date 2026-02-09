@@ -371,11 +371,20 @@ html, body, [class*="css"] {
         font-size: 0.7rem !important;
     }
     
-    /* Tab adjustments */
+    /* Tab adjustments - Better approach */
     .stTabs [data-baseweb="tab"] {
-        min-width: 60px;
-        padding: 8px 12px;
-        font-size: 1.2rem; /* Larger icons */
+        padding: 10px 8px !important;
+        min-width: 50px !important;
+        font-size: 1.8rem !important;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    
+    /* Hide everything except first emoji character */
+    .stTabs [data-baseweb="tab"] > div {
+        max-width: 30px;
+        overflow: hidden;
+        text-overflow: clip;
     }
     
     /* Reduce padding on mobile */
@@ -383,6 +392,12 @@ html, body, [class*="css"] {
         padding-top: 2rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
+    }
+    
+    /* Make selectbox dropdown scrollable on mobile */
+    .stSelectbox [data-baseweb="select"] {
+        max-height: 300px;
+        overflow-y: auto;
     }
 }
 
@@ -496,7 +511,8 @@ def load_vendor_mapping():
 
 def get_all_categories(file_path):
     db = load_item_db(file_path)
-    return sorted(set([i["category"] for i in db]))
+    categories = sorted(set([i["category"] for i in db if i["category"]]))
+    return categories if categories else ["No categories"]
 
 def get_all_units(file_path):
     db = load_item_db(file_path)
@@ -504,7 +520,8 @@ def get_all_units(file_path):
 
 def get_items_by_category(file_path, category):
     db = load_item_db(file_path)
-    return sorted([i["item"] for i in db if i["category"] == category])
+    items = sorted([i["item"] for i in db if i["category"] == category and i["item"]])
+    return items if items else ["No items"]
 
 def get_unit_for_item(file_path, category, item):
     db = load_item_db(file_path)
@@ -608,31 +625,10 @@ if not st.session_state.inventory.empty:
             st.dataframe(low_stock[["Branch", "Category", "Item", "CurrentQty", "MinQty", "Unit"]], use_container_width=True)
 
 # ================= Tabs ==================
+# Use CSS to hide tab text on mobile, always use full names in Python
+# CSS will handle the responsive behavior
 
-# Mobile Detection (viewport-based)
-# Inject JavaScript to detect screen width
-st.markdown("""
-<script>
-    // Detect if mobile (screen width < 768px)
-    const isMobile = window.innerWidth < 768;
-    // Store in sessionStorage
-    sessionStorage.setItem('isMobile', isMobile);
-    
-    // Send to Streamlit (optional, for Python access)
-    window.parent.postMessage({type: 'streamlit:setComponentValue', value: isMobile}, '*');
-</script>
-""", unsafe_allow_html=True)
-
-# Check if mobile mode from session state
-if "is_mobile" not in st.session_state:
-    # Default to desktop, will be updated by JS
-    st.session_state.is_mobile = False
-
-# Responsive tab names (from config)
-if st.session_state.get("is_mobile", False):
-    tab_names = TAB_NAMES_MOBILE
-else:
-    tab_names = TAB_NAMES_DESKTOP
+tab_names = TAB_NAMES_DESKTOP  # Always use desktop names, CSS will handle mobile
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(tab_names)
 
