@@ -371,11 +371,11 @@ html, body, [class*="css"] {
         font-size: 0.7rem !important;
     }
     
-    /* Mobile tab adjustments - show full text, just make tabs responsive */
+    /* Mobile tab adjustments - show full text in single horizontal line */
     .stTabs [data-baseweb="tab"] {
-        padding: 10px 8px !important;
-        font-size: 0.85rem !important;
-        white-space: normal !important;
+        padding: 10px 12px !important;
+        font-size: 0.9rem !important;
+        white-space: nowrap !important;
         line-height: 1.2 !important;
     }
     
