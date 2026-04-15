@@ -81,10 +81,11 @@ TAB_NAMES_DESKTOP = [
     "📈 Usage Analysis",
     "📄 Monthly Report",
     "💾 Data Management",
-    "❓ Help Manual"
+    "❓ Help Manual",
+    "🍽 Sales"
 ]
 
-TAB_NAMES_MOBILE = ["✏️", "📊", "🛒", "📦", "📈", "📄", "💾", "❓"]
+TAB_NAMES_MOBILE = ["✏️", "📊", "🛒", "📦", "📈", "📄", "💾", "❓", "🍽"]
 
 # ==================== Data Schema ====================
 INVENTORY_COLUMNS = ["Branch", "Item", "Category", "Unit", "CurrentQty", "MinQty", "Note", "Date"]

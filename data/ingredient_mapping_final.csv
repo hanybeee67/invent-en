@@ -1,0 +1,83 @@
+﻿레시피북_재료명,원가DB_재료명,상태,비고,타입
+ASEEL PURE GHEE (버터),ASEEL PURE GHEE,완료,,ingredient
+BESAN (병아리콩 가루),BESAN(SUNNY),완료,,ingredient
+CHAAT MASALA,CHAAT MASALA (MEHRAN),완료,,ingredient
+CORRIANDER WHOLE,CORRIANDER WHOLE(MEHRAN),완료,,ingredient
+CUMIN SEED WHOLE (커민씨드),CUMIN SEED WHOLE,완료,,ingredient
+Clove powder (정향가루),Clove powder,완료,,ingredient
+MURI (쌀튀밥),MURI,완료,,ingredient
+강황가루,TURMERIC POWDER,완료,,ingredient
+고수(고수잎),고수,완료,,ingredient
+고수잎,고수,완료,,ingredient
+고수잎·,고수,완료,,ingredient
+고수잎·박하잎,고수,완료,,ingredient
+냉동 딸기,냉동딸기,완료,,ingredient
+냉동 믹스 야채,FROZEN MIXED VEGETABLE,완료,,ingredient
+냉동 콜리플라워,FROZEN CAULI FLOWER,완료,,ingredient
+닭 (09호),닭 09호,완료,,ingredient
+닭 (닭다리),북채,완료,,ingredient
+닭 (부위 정육),정육(부위 닭),완료,,ingredient
+닭 가슴살,가슴 대한,완료,,ingredient
+닭가슴살 (정육),가슴 대한,완료,,ingredient
+망고 슬라이스,망고슬라이스,완료,,ingredient
+머턴 마살라 파우더,머튼마살라 파우더,완료,,ingredient
+머튼 마살라 파우더,머튼마살라 파우더,완료,,ingredient
+베트남 건고추,베트남(건고추),완료,,ingredient
+베트남 고추가루,베트남(고추가루),완료,,ingredient
+병아리콩 (삶은 것),병아리콩,완료,,ingredient
+스파게티 면 (삶은 것),스파게티면,완료,,ingredient
+스프링롤 페이스트리,스프링롤 페스트리,완료,,ingredient
+양상추·로메인,양상추,완료,,ingredient
+주름감자 (프렌치프라이용),주름감자(프렌치프라이),완료,,ingredient
+치즈 (퍼니르),치즈난 분말치즈,완료,,ingredient
+치킨 마살라 파우더,치킨마살라 파우더,완료,,ingredient
+치킨/머턴 마살라 파우더,치킨마살라 파우더,완료,,ingredient
+커민씨드,CUMIN SEED WHOLE,완료,,ingredient
+케찹 스파우트,케찹스파우트,완료,,ingredient
+크림스프 파우더,크림스프,완료,,ingredient
+탈각새우 31/40,탈각새우31/40,완료,,ingredient
+통밀가루 (아타),FERDAUS CHAKKI FRESH ATTA,완료,,ingredient
+티카 마살라 파우더,티카머설라 가루,완료,,ingredient
+퍼니르 (치즈),치즈난 분말치즈,완료,,ingredient
+퍼니르(치즈),치즈난 분말치즈,완료,,ingredient
+"해물 모듬 (새우, 오징어, 홍합 등)",해물모듬,완료,,ingredient
+바스마티 쌀,MEHRAN BASMATI RICE,완료,,ingredient
+요거트,멸균우유,완료,,ingredient
+요거트(더히),멸균우유,완료,,ingredient
+더히,멸균우유,완료,,ingredient
+더히 (요거트),멸균우유,완료,,ingredient
+정육 (닭),정육(부위 닭),완료,,ingredient
+캐슈넛 페이스트,캐슈넛,완료,,ingredient
+버터,ASEEL PURE GHEE,완료,,ingredient
+그린 샐러드,,완료,,prep
+기,ASEEL PURE GHEE,완료,,ingredient
+달머커니 소스,달머커니 소스,완료,프렙원가표 연동,prep
+베이비커리 소스,베이비커리,완료,프렙원가표 연동,prep
+탄두리 소스,탄두리 소스,완료,프렙원가표 연동,prep
+탄두리 샐라드,탄두리 샐러드,완료,프렙원가표 연동,prep
+모자렐라치즈,모자렐라치즈,완료,,zero
+사프란,,완료,원가 0원 처리,zero
+파프리카,,완료,원가 0원 처리,zero
+베이킹 파우더,베이킹 파우더,완료,원가 0원 처리,zero
+허니 (꿀),허니 (꿀),완료,원가 0원 처리,zero
+밥,국내산쌀,완료,,ingredient
+밥 (바스마티 라이스),MEHRAN BASMATI RICE,완료,,ingredient
+물,,완료,원가 0원 처리,zero
+물 또는 닭 육수,,완료,원가 0원 처리,zero
+물 또는 우유,멸균우유,완료,,ingredient
+물 또는 채소 육수,,완료,원가 0원 처리,zero
+샐러드,,완료,,prep
+닭 육수 또는 물,,완료,원가 0원 처리,zero
+메인 커리 (치킨/머턴/베지),,완료,조합메뉴 - 원가 집계 제외,skip
+머턴 커리 또는 달 머커니,,완료,조합메뉴 - 원가 집계 제외,skip
+치킨 커리 또는 베지 커리,,완료,조합메뉴 - 원가 집계 제외,skip
+스타터 (사모사 또는 모모),,완료,조합메뉴 - 원가 집계 제외,skip
+플레인 난,커리 그레이비 소스,완료,원가 0원 처리,zero
+플레인 난 또는 버터 난,커리 그레이비 소스,완료,원가 0원 처리,zero
+펄럭(시금치) 소스,펄럭(시금치) 소스,완료,프렙원가표 연동,prep
+크루통 (파펃 조각),,완료,원가 0원 처리,zero
+마요네즈 소스,마요네즈 소스,완료,원가 0원 처리,zero
+요거트 소스,멸균우유,완료,,ingredient
+디저트 (굴랍자문 또는 라스굴라),,완료,조합메뉴 - 원가 집계 제외,skip
+탄두리 요리 (티카 또는 케밥),,완료,조합메뉴 - 원가 집계 제외,skip
+커리 그레이비 소스,커리 그레이비 소스,완료,프렙원가표 연동,prep
