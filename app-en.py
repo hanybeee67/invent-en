@@ -622,7 +622,7 @@ if not st.session_state.inventory.empty:
 
 tab_names = TAB_NAMES_DESKTOP  # Always use desktop names, CSS will handle mobile
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(tab_names)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(tab_names)
 
 
 # ======================================================
@@ -1752,3 +1752,174 @@ with tab8:
         file_name="Everest_Manual.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+
+# ======================================================
+# TAB 9: 🍽 Sales — 판매 입력 · 재고 자동 차감 · 원가 손익
+# ======================================================
+with tab9:
+    st.header("🍽 Sales — 판매 입력 & 원가 분석")
+    st.caption("메뉴 판매 시 재고 자동 차감 · 식재료 원가 계산 · 손익 기록")
+
+    # logic.py 통합 함수 import
+    try:
+        from core.logic import (
+            get_available_menus,
+            get_menu_cost_breakdown,
+            deduct_by_menu,
+            get_sales_summary,
+            get_low_stock_items,
+        )
+        integration_ok = True
+    except ImportError as e:
+        st.error(f"통합 모듈 로드 실패: {e}")
+        integration_ok = False
+
+    if integration_ok:
+
+        # ── 상단: 재고 부족 알림 배너 ──────────────────────────
+        with st.expander("⚠ 재고 부족 알림 (클릭하여 확인)", expanded=False):
+            alert_branch = st.selectbox("지점 선택", BRANCHES, key="alert_branch")
+            low_items = get_low_stock_items(alert_branch)
+            if low_items:
+                st.warning(f"**{alert_branch}** 지점 재고 부족 {len(low_items)}건")
+                alert_df = pd.DataFrame(low_items)
+                st.dataframe(alert_df, use_container_width=True, hide_index=True)
+            else:
+                st.success(f"**{alert_branch}** 지점 재고 부족 없음 ✅")
+
+        st.markdown("---")
+
+        # ── 왼쪽: 판매 입력 / 오른쪽: 원가 미리보기 ─────────────
+        col_left, col_right = st.columns([1, 1], gap="large")
+
+        with col_left:
+            st.subheader("📋 판매 입력")
+
+            branch_sel = st.selectbox("지점", BRANCHES, key="sales_branch")
+
+            menus = get_available_menus()
+            menu_sel = st.selectbox(
+                "메뉴 선택",
+                menus,
+                key="sales_menu",
+                help="레시피북에 등록된 87개 메뉴"
+            )
+
+            servings_sel = st.number_input(
+                "인분 수",
+                min_value=1, max_value=50, value=1, step=1,
+                key="sales_servings"
+            )
+
+            sale_price_sel = st.number_input(
+                "판매가 (원, 선택)",
+                min_value=0, value=0, step=500,
+                key="sales_price",
+                help="입력 시 마진율 자동 계산 / 0 입력 시 생략"
+            )
+
+            st.markdown("")
+            btn_preview = st.button("🔍 원가 미리보기", use_container_width=True, key="btn_preview")
+            btn_confirm = st.button("✅ 판매 확정 (재고 차감)", use_container_width=True,
+                                    type="primary", key="btn_confirm")
+
+        with col_right:
+            st.subheader("💰 원가 내역")
+
+            if btn_preview or btn_confirm:
+                items, total_cost = get_menu_cost_breakdown(menu_sel, servings_sel)
+
+                if items is None:
+                    st.error(total_cost)
+                else:
+                    # 원가 카드
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("식재료 원가", f"₩{total_cost:,.0f}")
+                    if sale_price_sel > 0:
+                        margin = sale_price_sel - total_cost
+                        margin_rate = round(margin / sale_price_sel * 100, 1)
+                        m2.metric("마진", f"₩{margin:,.0f}")
+                        m3.metric("마진율", f"{margin_rate}%",
+                                  delta=f"{'양호' if margin_rate >= 60 else '점검 필요'}",
+                                  delta_color="normal" if margin_rate >= 60 else "inverse")
+                    else:
+                        m2.metric("판매가", "미입력")
+                        m3.metric("마진율", "-")
+
+                    st.markdown("")
+
+                    # 식재료 상세 테이블
+                    rows = []
+                    for i in items:
+                        type_label = {"ingredient": "식재료", "prep": "프렙", "zero": "0원"}.get(i["type"], i["type"])
+                        rows.append({
+                            "재료명": i["ingredient"],
+                            "원가DB 연결": i["mapped"] if i["mapped"] != "-" else "",
+                            "사용량(g)": f"{i['qty_g']:.0f}g",
+                            "단가(원/g)": f"{i['price_per_g']:.2f}" if i["price_per_g"] else "-",
+                            "원가(원)": f"₩{i['cost']:,.0f}" if i["cost"] else "-",
+                            "구분": type_label,
+                        })
+                    st.dataframe(
+                        pd.DataFrame(rows),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    # 판매 확정 처리
+                    if btn_confirm:
+                        ok, msg, alerts = deduct_by_menu(
+                            menu_sel, servings_sel, branch_sel,
+                            sale_price=float(sale_price_sel)
+                        )
+                        if ok:
+                            st.success(f"✅ {msg}")
+                            if alerts:
+                                st.warning("⚠ 재고 부족 품목:\n" + "\n".join(f"• {a}" for a in alerts))
+                        else:
+                            st.error(f"❌ 처리 실패: {msg}")
+
+        st.markdown("---")
+
+        # ── 하단: 판매 로그 & 손익 요약 ────────────────────────
+        st.subheader("📊 판매 로그 & 손익 요약")
+
+        log_col1, log_col2, log_col3 = st.columns([1, 1, 1])
+        with log_col1:
+            log_branch = st.selectbox("지점 필터", ["전체"] + BRANCHES, key="log_branch")
+        with log_col2:
+            log_start = st.date_input("시작일", value=None, key="log_start")
+        with log_col3:
+            log_end = st.date_input("종료일", value=None, key="log_end")
+
+        sales_df = get_sales_summary(
+            branch=None if log_branch == "전체" else log_branch,
+            start_date=str(log_start) if log_start else None,
+            end_date=str(log_end) if log_end else None,
+        )
+
+        if sales_df.empty:
+            st.info("아직 판매 기록이 없습니다. 위에서 판매 확정을 누르면 여기에 기록됩니다.")
+        else:
+            # 요약 지표
+            s1, s2, s3, s4 = st.columns(4)
+            s1.metric("총 판매 건수",   f"{len(sales_df)}건")
+            s2.metric("총 매출",        f"₩{sales_df['SalePrice'].sum():,.0f}")
+            s3.metric("총 식재료 원가",  f"₩{sales_df['FoodCost'].sum():,.0f}")
+            avg_margin = sales_df['MarginRate'].mean()
+            s4.metric("평균 마진율",    f"{avg_margin:.1f}%")
+
+            st.dataframe(
+                sales_df.sort_values("Date", ascending=False),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # CSV 다운로드
+            csv_data = sales_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            st.download_button(
+                "⬇ 판매 로그 다운로드 (CSV)",
+                data=csv_data,
+                file_name=f"sales_log_{date.today()}.csv",
+                mime="text/csv"
+            )
