@@ -1,35 +1,16 @@
 services:
-  # ── 서비스 1: POS 연동 REST API (FastAPI) ─────────────────────
-  # URL: https://everest-inventory.onrender.com
   - type: web
     name: everest-inventory
     env: python
-    plan: starter
+    plan: starter # 디스크 사용을 위해 Starter 플랜 필수
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    startCommand: bash start.sh
     envVars:
       - key: PYTHON_VERSION
         value: "3.10.12"
       - key: INTERNAL_API_KEY
         sync: false   # Render 대시보드에서 직접 입력
-    # 영구 저장소 (Streamlit 앱과 공유)
-    disk:
-      name: inventory-data
-      mountPath: /data
-      sizeGB: 1
-
-  # ── 서비스 2: 재고관리 UI (Streamlit) ─────────────────────────
-  # URL: https://everest-inventory-ui.onrender.com
-  - type: web
-    name: everest-inventory-ui
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run app-en.py --server.port $PORT --server.address 0.0.0.0
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.10.12"
-    # 같은 영구 저장소를 마운트해서 데이터 공유
+    # 영구 저장소 설정 (서버 재시작 시 데이터 보존)
     disk:
       name: inventory-data
       mountPath: /data
